@@ -1,0 +1,13 @@
+{
+  "name": "midigen",
+  "description": "Generate midi files for live performance",
+  "version": "0.0.1",
+  "author": "Jason Dufair <jase@purdue.edu>",
+  "license": "MIT",
+  "main": "src/main.js",
+  "scripts": {},
+  "dependencies": {
+    "midi-writer-js": "^2.1.4",
+    "tonal-midi": "^0.69.7"
+  }
+}
