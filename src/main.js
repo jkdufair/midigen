@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 //#region Imports
 const fs = require('fs')
 const midiWriter = require('./midi-writer-js.cjs')
@@ -18,7 +20,6 @@ const rc5Clear = 82
 
 const onSongChannel = 4
 const onSongNextSection = 1
-const onSongStartMetronome = 2
 const onSongStopMetronome = 3
 
 const on = 127
@@ -109,13 +110,6 @@ const eventFromName = (eventName, delta) => {
 				})
 			]
 
-		case 'metronome-start':
-			return new ControllerChangeEvent({
-				controllerNumber: onSongStartMetronome,
-				controllerValue: on,
-				channel: onSongChannel,
-				delta: delta
-			})
 		case 'metronome-stop':
 			return new ControllerChangeEvent({
 				controllerNumber: onSongStopMetronome,
@@ -142,7 +136,7 @@ track.setTempo(spec.tempo)
 // Initial program change for VL3 and HD500X
 track.addEvent(new ProgramChangeEvent({channel: vl3Channel - 1, instrument: spec.vl3Program - 1}))
 // "Main" bank on HD500X
-// TODO: Make this configurable
+// TODO: Make the setlist configurable
 track.addEvent(new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: 0}))
 track.addEvent(new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 32, controllerValue: 6, delta: 0}))
 track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(spec.hd500xProgram)}))
@@ -150,13 +144,8 @@ track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: h
 // Reset RC-5
 track.addEvent(eventFromName('rc5-clear', 0))
 
-// Start metronome
-track.addEvent(eventFromName('metronome-start', 0))
-
 // Set delta to the start of the first measure
-// The eighth and 16th are a hack to line the metronome up with the actual ticks.
-// OnSong delays the start of the metronome. Not sure if this works for all tempos.
-let delta = Utils.getTickDuration(['1', '8', '16'])
+let delta = Utils.getTickDuration(['1'])
 
 // Iterate over sections and add events
 spec.sections.forEach(section => {
@@ -169,16 +158,19 @@ spec.sections.forEach(section => {
 		delta = 0
 		events.shift()
 	}
-	track.controllerChange(onSongNextSection, 64, onSongChannel, delta)
+	track.controllerChange(onSongNextSection, on, onSongChannel, delta)
 	delta = 0
 
 	let sectionTicksLeft = ticksFromPosition(section.length)
 	let previousEventPosition = ""
+	let lastEventOffset = 0
 	events?.forEach(event => {
 		if (previousEventPosition !== event.position) {
 			const eventOffsetFromSectionStart = ticksFromPosition(event.position)
-			delta += eventOffsetFromSectionStart
-			sectionTicksLeft -= eventOffsetFromSectionStart
+			const nextDelta = eventOffsetFromSectionStart - lastEventOffset
+			delta = nextDelta
+			lastEventOffset = eventOffsetFromSectionStart
+			sectionTicksLeft -= nextDelta
 		} else {
 			delta = 0
 		}
@@ -190,8 +182,10 @@ spec.sections.forEach(section => {
 		} else {
 			track.addEvent(eventOrEvents)
 		}
+		delta = 0
 		previousEventPosition = event.position
 	})
+	// Delta will either be 0 if an event was issued during the section or it will accumulate in sections without events
 	delta += sectionTicksLeft
 })
 
@@ -200,7 +194,7 @@ track.addEvent(eventFromName('metronome-stop', delta))
 
 const write = new Writer(track)
 
-//console.log(track)
+console.log(track)
 
 const buffer = new Buffer.from(write.buildFile())
 const outputFile = process.argv[2].replace('.json', '.mid')
