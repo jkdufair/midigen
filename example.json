@@ -1,0 +1,121 @@
+{
+	"title": "Angel From Montgomery",
+	"tempo": 125,
+	"timeSignature": "4/4",
+	"vl3Program": 2,
+	"hd500xProgram": "2A",
+	"sections": [
+		{
+			"name": "Intro",
+			"length": "8.0.0"
+		},
+		{
+			"name": "Verse 1",
+			"length": "16.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "rc5-rec-play"
+				}
+			]
+		},
+		{
+			"name": "Chorus 1",
+			"length": "19.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "rc5-stop"
+				},
+				{
+					"position": "0.0.0",
+					"event": "harmony-on"
+				}
+			]
+		},
+		{
+			"name": "Verse 2",
+			"length": "16.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "harmony-off"
+				}
+			]
+		},
+		{
+			"name": "Chorus 2",
+			"length": "19.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "harmony-on"
+				}
+			]
+		},
+		{
+			"name": "Lead",
+			"length": "16.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "rc5-rec-play"
+				},
+				{
+					"position": "0.0.0",
+					"event": "hd500x-fs1-on"
+				},
+				{
+					"position": "0.0.0",
+					"event": "harmony-off"
+				}
+			]
+		},
+		{
+			"name": "Interlude",
+			"length": "4.0.0"
+		},
+		{
+			"name": "Verse 3",
+			"length": "16.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "rc5-rec-play"
+				},
+				{
+					"position": "0.0.0",
+					"event": "hd500x-fs1-off"
+				}
+			]
+		},
+		{
+			"name": "Chorus 3",
+			"length": "19.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "harmony-on"
+				}
+			]
+		},
+		{
+			"name": "Outro",
+			"length": "8.0.0",
+			"events": [
+				{
+					"position": "0.0.0",
+					"event": "harmony-off"
+				},
+				{
+					"position": "3.0.0",
+					"event": "metronome-stop"
+				},
+				{
+					"position": "3.0.0",
+					"event": "harmony-on"
+				}
+			]
+		}
+	]
+}
