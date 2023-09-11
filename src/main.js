@@ -35,8 +35,8 @@ const hd500xProgram = (programPreset) => {
 	return (parseInt(bank) - 1) * 4 + offset - 1
 }
 
-const ticksFromPosition = (position) => {
-	const [measures, beats, subdivisions] = position.split('.').map(x => parseInt(x))
+const ticksFromLength = (length) => {
+	const [measures, beats, subdivisions] = length.split('.').map(x => parseInt(x))
 
 	// TODO: Make sure this works with all time signatures
 	return Utils.getTickDuration('1') * measures +
@@ -44,7 +44,17 @@ const ticksFromPosition = (position) => {
 		Utils.getTickDuration('16') * subdivisions
 }
 
-const eventFromName = (eventName, delta) => {
+const ticksFromPosition = (position) => {
+	const [measures, beats, subdivisions] = position.split('.').map(x => parseInt(x))
+
+	// TODO: Make sure this works with all time signatures
+	// Note: position specification is 1-based (i.e. 1.1.1 is the start of the measure)
+	return Utils.getTickDuration('1') * (measures - 1) +
+		Utils.getTickDuration('4') * (beats - 1) +
+		Utils.getTickDuration('16') * (subdivisions - 1)
+}
+
+const eventFromName = (eventName, delta, parameter) => {
 	switch (eventName) {
 		case 'harmony-on':
 			return new ControllerChangeEvent({
@@ -75,6 +85,12 @@ const eventFromName = (eventName, delta) => {
 				channel: hd500xChannel,
 				delta: delta
 			})
+		case 'hd500x-patch-change':
+			return [
+				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: 0}),
+				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 32, controllerValue: 6, delta: 0}),
+				new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(parameter)})
+			]
 
 		case 'rc5-rec-play':
 			return [
@@ -109,6 +125,7 @@ const eventFromName = (eventName, delta) => {
 					controllerNumber: rc5Clear, controllerValue: off, channel: rc5Channel, delta: 0
 				})
 			]
+
 
 		case 'metronome-stop':
 			return new ControllerChangeEvent({
@@ -145,36 +162,27 @@ track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: h
 track.addEvent(eventFromName('rc5-clear', 0))
 
 // Set delta to the start of the first measure
-let delta = Utils.getTickDuration(['1'])
+// Add an extra 32nd note since OnSong seems to take that long to start the track after starting the metronome.
+let nextEventDelta = Utils.getTickDuration(['1', '32'])
 
 // Iterate over sections and add events
 spec.sections.forEach(section => {
-	// Handle stupid RC-5 if it's the first event in the section with an offset of 0
-	const events = section.events
-	if (events != null && events.length > 0 && events[0].event.startsWith('rc5') && events[0].position === '0.0.0') {
-		eventFromName(events[0].event, delta).forEach(e => {
-			track.addEvent(e)
-		})
-		delta = 0
-		events.shift()
-	}
-	track.controllerChange(onSongNextSection, on, onSongChannel, delta)
-	delta = 0
+	// Move the pointer in OnSong to the next section
+	track.controllerChange(onSongNextSection, on, onSongChannel, nextEventDelta)
+	nextEventDelta = 0
 
-	let sectionTicksLeft = ticksFromPosition(section.length)
+	let sectionTickLength = ticksFromLength(section.length)
 	let previousEventPosition = ""
-	let lastEventOffset = 0
-	events?.forEach(event => {
+	let sectionTickPointer = 0
+
+	section.events?.forEach(event => {
 		if (previousEventPosition !== event.position) {
 			const eventOffsetFromSectionStart = ticksFromPosition(event.position)
-			const nextDelta = eventOffsetFromSectionStart - lastEventOffset
-			delta = nextDelta
-			lastEventOffset = eventOffsetFromSectionStart
-			sectionTicksLeft -= nextDelta
-		} else {
-			delta = 0
+			nextEventDelta = eventOffsetFromSectionStart - sectionTickPointer
+			sectionTickPointer += nextEventDelta
 		}
-		const eventOrEvents = eventFromName(event.event, delta)
+		previousEventPosition = event.position
+		const eventOrEvents = eventFromName(event.event, nextEventDelta, event.parameter)
 		if (Array.isArray(eventOrEvents)) {
 			eventOrEvents.forEach(e => {
 				track.addEvent(e)
@@ -182,19 +190,20 @@ spec.sections.forEach(section => {
 		} else {
 			track.addEvent(eventOrEvents)
 		}
-		delta = 0
-		previousEventPosition = event.position
+		nextEventDelta = 0
 	})
-	// Delta will either be 0 if an event was issued during the section or it will accumulate in sections without events
-	delta += sectionTicksLeft
+	// This will either be 0 if an event was issued during the section or it will accumulate in sections without events
+	nextEventDelta += sectionTickLength - sectionTickPointer
 })
 
 // Stop the metronome
-track.addEvent(eventFromName('metronome-stop', delta))
+track.addEvent(eventFromName('metronome-stop', nextEventDelta))
+// Stop the RC-5
+track.addEvent(eventFromName('rc5-stop', 0))
 
 const write = new Writer(track)
 
-console.log(track)
+// console.log(track)
 
 const buffer = new Buffer.from(write.buildFile())
 const outputFile = process.argv[2].replace('.json', '.mid')
