@@ -13,6 +13,9 @@ const vl3Harmony = 110
 
 const hd500xChannel = 2
 const hd500xFootswitch1 = 51
+const hd500xFootswitch2 = 52
+const hd500xFootswitch3 = 53
+const hd500xFootswitch4 = 54
 
 const rc5Channel = 3
 const rc5RecPlay = 80
@@ -85,9 +88,51 @@ const eventFromName = (eventName, delta, parameter) => {
 				channel: hd500xChannel,
 				delta: delta
 			})
+		case 'hd500x-fs2-on':
+			return new ControllerChangeEvent({
+				controllerNumber: hd500xFootswitch2,
+				controllerValue: on,
+				channel: hd500xChannel,
+				delta: delta
+			})
+		case 'hd500x-fs2-off':
+			return new ControllerChangeEvent({
+				controllerNumber: hd500xFootswitch2,
+				controllerValue: off,
+				channel: hd500xChannel,
+				delta: delta
+			})
+		case 'hd500x-fs3-on':
+			return new ControllerChangeEvent({
+				controllerNumber: hd500xFootswitch3,
+				controllerValue: on,
+				channel: hd500xChannel,
+				delta: delta
+			})
+		case 'hd500x-fs3-off':
+			return new ControllerChangeEvent({
+				controllerNumber: hd500xFootswitch3,
+				controllerValue: off,
+				channel: hd500xChannel,
+				delta: delta
+			})
+		case 'hd500x-fs4-on':
+			return new ControllerChangeEvent({
+				controllerNumber: hd500xFootswitch4,
+				controllerValue: on,
+				channel: hd500xChannel,
+				delta: delta
+			})
+		case 'hd500x-fs4-off':
+			return new ControllerChangeEvent({
+				controllerNumber: hd500xFootswitch4,
+				controllerValue: off,
+				channel: hd500xChannel,
+				delta: delta
+			})
 		case 'hd500x-patch-change':
 			return [
-				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: 0}),
+				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: delta}),
 				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 32, controllerValue: 6, delta: 0}),
 				new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(parameter)})
 			]
@@ -199,11 +244,11 @@ spec.sections.forEach(section => {
 // Stop the metronome
 track.addEvent(eventFromName('metronome-stop', nextEventDelta))
 // Stop the RC-5
-track.addEvent(eventFromName('rc5-stop', 0))
+track.addEvent(eventFromName('rc5-clear', 0))
 
 const write = new Writer(track)
 
-// console.log(track)
+console.log(track)
 
 const buffer = new Buffer.from(write.buildFile())
 const outputFile = process.argv[2].replace('.json', '.mid')
