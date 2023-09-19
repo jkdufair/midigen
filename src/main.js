@@ -130,11 +130,12 @@ const eventFromName = (eventName, delta, parameter) => {
 				channel: hd500xChannel,
 				delta: delta
 			})
+		// TODO: Currently, this chokes if it's right at the start of the section. Figure out why.
 		case 'hd500x-patch-change':
 			return [
 				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: delta}),
 				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 32, controllerValue: 6, delta: 0}),
-				new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(parameter)})
+				new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(parameter), delta: 0})
 			]
 
 		case 'rc5-rec-play':
@@ -212,11 +213,15 @@ let nextEventDelta = Utils.getTickDuration(['1', '32'])
 
 // Iterate over sections and add events
 spec.sections.forEach(section => {
+	let sectionTickLength = ticksFromLength(section.length)
+	console.log(`----- ${section.name}: ${sectionTickLength} -----`)
+
 	// Move the pointer in OnSong to the next section
 	track.controllerChange(onSongNextSection, on, onSongChannel, nextEventDelta)
+	console.log(`Section change after ${nextEventDelta}`)
+	let sectionDeltaSum = 0
 	nextEventDelta = 0
 
-	let sectionTickLength = ticksFromLength(section.length)
 	let previousEventPosition = ""
 	let sectionTickPointer = 0
 
@@ -224,8 +229,10 @@ spec.sections.forEach(section => {
 		if (previousEventPosition !== event.position) {
 			const eventOffsetFromSectionStart = ticksFromPosition(event.position)
 			nextEventDelta = eventOffsetFromSectionStart - sectionTickPointer
+			sectionDeltaSum += nextEventDelta
 			sectionTickPointer += nextEventDelta
 		}
+		console.log(`${event.event} at ${event.position} after ${nextEventDelta}`)
 		previousEventPosition = event.position
 		const eventOrEvents = eventFromName(event.event, nextEventDelta, event.parameter)
 		if (Array.isArray(eventOrEvents)) {
@@ -239,6 +246,10 @@ spec.sections.forEach(section => {
 	})
 	// This will either be 0 if an event was issued during the section or it will accumulate in sections without events
 	nextEventDelta += sectionTickLength - sectionTickPointer
+	sectionDeltaSum += nextEventDelta
+	console.log(`Section delta sum: ${sectionDeltaSum}`)
+	console.log('--------------------------')
+	console.log()
 })
 
 // Stop the metronome
