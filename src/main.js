@@ -10,6 +10,7 @@ const {ControllerChangeEvent, ProgramChangeEvent, Track, Utils, Writer} = midiWr
 
 const vl3Channel = 1
 const vl3Harmony = 110
+const vl3Double = 111
 
 const hd500xChannel = 2
 const hd500xFootswitch1 = 51
@@ -73,7 +74,20 @@ const eventFromName = (eventName, delta, parameter) => {
 				channel: vl3Channel,
 				delta: delta
 			})
-
+		case 'vocal-double-on':
+			return new ControllerChangeEvent({
+				controllerNumber: vl3Double,
+				controllerValue: on,
+				channel: vl3Channel,
+				delta: delta
+			})
+		case 'vocal-double-off':
+			return new ControllerChangeEvent({
+				controllerNumber: vl3Double,
+				controllerValue: off,
+				channel: vl3Channel,
+				delta: delta
+			})
 		case 'hd500x-fs1-on':
 			return new ControllerChangeEvent({
 				controllerNumber: hd500xFootswitch1,
@@ -183,6 +197,33 @@ const eventFromName = (eventName, delta, parameter) => {
 	}
 }
 
+const channelToDevice = (channel) => {
+  switch (channel) {
+      case 0:
+        return 'VL3'
+      case 1:
+        return 'HD500x'
+      case 2:
+        return 'RC-5'
+      case 3:
+        return 'OnSong'
+  }
+}
+
+const writeSpecEvent = (event, delta, track) => {
+		const eventOrEvents = eventFromName(event.event, delta, event.parameter)
+		if (Array.isArray(eventOrEvents)) {
+			eventOrEvents.forEach(e => {
+				track.addEvent(e)
+		    console.log(`${channelToDevice(e.channel)} ${e.name} after ${e.delta}`)
+			})
+		} else {
+			track.addEvent(eventOrEvents)
+		    console.log(`${channelToDevice(eventOrEvents.channel)} ${eventOrEvents.name} after ${eventOrEvents.delta}`)
+		}
+
+}
+
 //#endregion Support Functions
 
 const track = new Track()
@@ -192,74 +233,85 @@ const inputFile = process.argv[2]
 const spec = JSON.parse(fs.readFileSync(inputFile, 'utf8'))
 
 // Set time signature and tempo
-const [time_beats, time_division] = spec.timeSignature.split('/').map(x => parseInt(x))
-track.setTimeSignature(time_beats, time_division)
+const [timeBeats, timeDivision] = spec.timeSignature.split('/').map(x => parseInt(x))
+track.setTimeSignature(timeBeats, timeDivision)
 track.setTempo(spec.tempo)
 
 // Initial program change for VL3 and HD500X
 track.addEvent(new ProgramChangeEvent({channel: vl3Channel - 1, instrument: spec.vl3Program - 1}))
+
 // "Main" bank on HD500X
 // TODO: Make the setlist configurable
 track.addEvent(new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: 0}))
 track.addEvent(new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 32, controllerValue: 6, delta: 0}))
-track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(spec.hd500xProgram)}))
+track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(spec.hd500xProgram), delta: 0}))
 
 // Reset RC-5
 track.addEvent(eventFromName('rc5-clear', 0))
 
 // Set delta to the start of the first measure
 // Add an extra 32nd note since OnSong seems to take that long to start the track after starting the metronome.
-let nextEventDelta = Utils.getTickDuration(['1', '32'])
+let nextEventDelta = Utils.getTickDuration('1')
 
 // Iterate over sections and add events
 spec.sections.forEach(section => {
 	let sectionTickLength = ticksFromLength(section.length)
 	console.log(`----- ${section.name}: ${sectionTickLength} -----`)
 
-	// Move the pointer in OnSong to the next section
-	track.controllerChange(onSongNextSection, on, onSongChannel, nextEventDelta)
-	console.log(`Section change after ${nextEventDelta}`)
-	let sectionDeltaSum = 0
-	nextEventDelta = 0
-
 	let previousEventPosition = ""
+	let sectionDeltaSum = 0
 	let sectionTickPointer = 0
+	// Write all the 1.1.1 events first, if any. First one gets written at the
+	// section's nextEventDelta. Rest are delta 0
+	section.events?.filter(event => event.position === '1.1.1').forEach(event => {
+		writeSpecEvent(event, nextEventDelta, track)
+		nextEventDelta = 0
+	})
 
-	section.events?.forEach(event => {
+	// Write the OnSong section change 16 ticks later
+	let stupidOnSongOffset = 16
+	track.controllerChange(onSongNextSection, on, onSongChannel, nextEventDelta + stupidOnSongOffset)
+	nextEventDelta = 0
+	sectionDeltaSum += stupidOnSongOffset
+	sectionTickPointer += stupidOnSongOffset
+
+	// Iterate over remaining events. First one will be shifted 16 ticks earlier to account for the section
+	// change being 16 ticks later and have it line up to the proper position
+	section.events?.filter(event => event.position !== '1.1.1').forEach(event => {
 		if (previousEventPosition !== event.position) {
 			const eventOffsetFromSectionStart = ticksFromPosition(event.position)
 			nextEventDelta = eventOffsetFromSectionStart - sectionTickPointer
 			sectionDeltaSum += nextEventDelta
 			sectionTickPointer += nextEventDelta
-		}
-		console.log(`${event.event} at ${event.position} after ${nextEventDelta}`)
-		previousEventPosition = event.position
-		const eventOrEvents = eventFromName(event.event, nextEventDelta, event.parameter)
-		if (Array.isArray(eventOrEvents)) {
-			eventOrEvents.forEach(e => {
-				track.addEvent(e)
-			})
-		} else {
-			track.addEvent(eventOrEvents)
-		}
+    }
+		writeSpecEvent(event, nextEventDelta, track)
+    previousEventPosition = event.position
 		nextEventDelta = 0
 	})
-	// This will either be 0 if an event was issued during the section or it will accumulate in sections without events
+
 	nextEventDelta += sectionTickLength - sectionTickPointer
 	sectionDeltaSum += nextEventDelta
-	console.log(`Section delta sum: ${sectionDeltaSum}`)
-	console.log('--------------------------')
+
+  console.log(`Section delta sum: ${sectionDeltaSum}`)
 	console.log()
 })
 
 // Stop the metronome
 track.addEvent(eventFromName('metronome-stop', nextEventDelta))
+
 // Stop the RC-5
 track.addEvent(eventFromName('rc5-clear', 0))
 
 const write = new Writer(track)
 
-console.log(track)
+console.log(JSON.stringify(track, null, 4)
+                .replaceAll('"channel": 0', '---VL3---')
+                .replaceAll('"channel": 1', '---HD500X---')
+                .replaceAll('"channel": 2', '---RC5---')
+                .replaceAll('"channel": 3', '---OnSong---')
+                .replaceAll(/\"status.*?,[\s\S]/g, '')
+                .replaceAll(/\"data.*?\[[\s\S]*?\]/g, '')
+                .replaceAll('            "name": "Program', '"name": "Program'))
 
 const buffer = new Buffer.from(write.buildFile())
 const outputFile = process.argv[2].replace('.json', '.mid')
