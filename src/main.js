@@ -3,8 +3,22 @@
 //#region Imports
 const fs = require('fs')
 const midiWriter = require('./midi-writer-js.cjs')
-const {ControllerChangeEvent, ProgramChangeEvent, Track, Utils, Writer} = midiWriter
+const WaveFile = require('wavefile').WaveFile
+const {ControllerChangeEvent, NoteEvent, ProgramChangeEvent, Track, Utils, Writer} = midiWriter
+const child_process = require("child_process")
+const winston = require('winston')
 //#endregion Imports
+
+//#region Logging
+const logger = winston.createLogger({
+	level: 'info',
+	format: winston.format.json(),
+	transports: [
+		new winston.transports.Console({
+			format: winston.format.simple()
+		})
+	]
+})
 
 //#region Constants
 
@@ -24,6 +38,7 @@ const rc5Clear = 82
 
 const onSongChannel = 4
 const onSongNextSection = 1
+const onSongStartMetronome = 126
 const onSongStopMetronome = 3
 
 const on = 127
@@ -39,23 +54,23 @@ const hd500xProgram = (programPreset) => {
 	return (parseInt(bank) - 1) * 4 + offset - 1
 }
 
-const ticksFromLength = (length) => {
+const ticksFromLength = (length, beatsPerMeasure) => {
 	const [measures, beats, subdivisions] = length.split('.').map(x => parseInt(x))
 
 	// TODO: Make sure this works with all time signatures
-	return Utils.getTickDuration('1') * measures +
-		Utils.getTickDuration('4') * beats +
-		Utils.getTickDuration('16') * subdivisions
+	return Utils.getTickDuration('1', beatsPerMeasure) * measures +
+		Utils.getTickDuration('4', beatsPerMeasure) * beats +
+		Utils.getTickDuration('16', beatsPerMeasure) * subdivisions
 }
 
-const ticksFromPosition = (position) => {
+const ticksFromPosition = (position, beatsPerMeasure) => {
 	const [measures, beats, subdivisions] = position.split('.').map(x => parseInt(x))
 
-	// TODO: Make sure this works with all time signatures
 	// Note: position specification is 1-based (i.e. 1.1.1 is the start of the measure)
-	return Utils.getTickDuration('1') * (measures - 1) +
-		Utils.getTickDuration('4') * (beats - 1) +
-		Utils.getTickDuration('16') * (subdivisions - 1)
+	// 8.4.4 is, i.e., the point at the 8th measure, 4th beat, 4th 16th note
+	return Utils.getTickDuration('1', beatsPerMeasure) * (measures - 1) +
+		Utils.getTickDuration('4', beatsPerMeasure) * (beats - 1) +
+		Utils.getTickDuration('16', beatsPerMeasure) * (subdivisions - 1)
 }
 
 const eventFromName = (eventName, delta, parameter) => {
@@ -88,6 +103,13 @@ const eventFromName = (eventName, delta, parameter) => {
 				channel: vl3Channel,
 				delta: delta
 			})
+		case 'vl3-patch-change':
+			return new ProgramChangeEvent({
+				channel: vl3Channel - 1,
+				instrument: parameter - 1,
+				delta: delta
+			})
+
 		case 'hd500x-fs1-on':
 			return new ControllerChangeEvent({
 				controllerNumber: hd500xFootswitch1,
@@ -144,7 +166,6 @@ const eventFromName = (eventName, delta, parameter) => {
 				channel: hd500xChannel,
 				delta: delta
 			})
-		// TODO: Currently, this chokes if it's right at the start of the section. Figure out why.
 		case 'hd500x-patch-change':
 			return [
 				new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: delta}),
@@ -186,6 +207,13 @@ const eventFromName = (eventName, delta, parameter) => {
 				})
 			]
 
+		case 'metronome-start':
+			return new ControllerChangeEvent({
+				controllerNumber: onSongStartMetronome,
+				controllerValue: on,
+				channel: onSongChannel,
+				delta: delta
+			})
 
 		case 'metronome-stop':
 			return new ControllerChangeEvent({
@@ -197,44 +225,29 @@ const eventFromName = (eventName, delta, parameter) => {
 	}
 }
 
-const channelToDevice = (channel) => {
-  switch (channel) {
-      case 0:
-        return 'VL3'
-      case 1:
-        return 'HD500x'
-      case 2:
-        return 'RC-5'
-      case 3:
-        return 'OnSong'
-  }
-}
-
 const writeSpecEvent = (event, delta, track) => {
 		const eventOrEvents = eventFromName(event.event, delta, event.parameter)
 		if (Array.isArray(eventOrEvents)) {
 			eventOrEvents.forEach(e => {
 				track.addEvent(e)
-		    console.log(`${channelToDevice(e.channel)} ${e.name} after ${e.delta}`)
 			})
 		} else {
 			track.addEvent(eventOrEvents)
-		    console.log(`${channelToDevice(eventOrEvents.channel)} ${eventOrEvents.name} after ${eventOrEvents.delta}`)
 		}
 
 }
 
 //#endregion Support Functions
 
-const track = new Track()
+let track = new Track()
 
 // Get the spec file
 const inputFile = process.argv[2]
 const spec = JSON.parse(fs.readFileSync(inputFile, 'utf8'))
 
 // Set time signature and tempo
-const [timeBeats, timeDivision] = spec.timeSignature.split('/').map(x => parseInt(x))
-track.setTimeSignature(timeBeats, timeDivision)
+const [beatsPerMeasure, timeDivision] = spec.timeSignature.split('/').map(x => parseInt(x))
+track.setTimeSignature(beatsPerMeasure, timeDivision)
 track.setTempo(spec.tempo)
 
 // Initial program change for VL3 and HD500X
@@ -249,51 +262,69 @@ track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: h
 // Reset RC-5
 track.addEvent(eventFromName('rc5-clear', 0))
 
-// Set delta to the start of the first measure
-// Add an extra 32nd note since OnSong seems to take that long to start the track after starting the metronome.
-let nextEventDelta = Utils.getTickDuration('1')
+// Set delta to the start of the first measure (count off)
+let nextEventDelta = Utils.getTickDuration(['1'], beatsPerMeasure)
 
+let totalMeasures = 1
 // Iterate over sections and add events
 spec.sections.forEach(section => {
-	let sectionTickLength = ticksFromLength(section.length)
-	console.log(`----- ${section.name}: ${sectionTickLength} -----`)
+	let sectionTickLength = ticksFromLength(section.length, beatsPerMeasure)
+	// TODO: handle sections with partial measures
+	totalMeasures += parseInt(section.length.split('.')[0])
+	logger.info(`totalMeasures: ${totalMeasures}`)
+	logger.info(`----- ${section.name}: ${sectionTickLength} -----`)
 
 	let previousEventPosition = ""
 	let sectionDeltaSum = 0
-	let sectionTickPointer = 0
 	// Write all the 1.1.1 events first, if any. First one gets written at the
 	// section's nextEventDelta. Rest are delta 0
+	logger.debug('1.1.1 events')
 	section.events?.filter(event => event.position === '1.1.1').forEach(event => {
+		logger.info(`-- Event ${event.event} at ${event.position} --`)
+		logger.debug(`nextEventDelta: ${nextEventDelta}`)
 		writeSpecEvent(event, nextEventDelta, track)
 		nextEventDelta = 0
+		logger.debug('nextEventDelta reset to 0')
 	})
+	logger.debug('End of 1.1.1 events')
+	logger.debug('')
 
 	// Write the OnSong section change 16 ticks later
-	let stupidOnSongOffset = 16
+	const stupidOnSongOffset = 16
 	track.controllerChange(onSongNextSection, on, onSongChannel, nextEventDelta + stupidOnSongOffset)
+	logger.debug(`OnSong section change at ${nextEventDelta + stupidOnSongOffset} (nextEventDelta: ${nextEventDelta})`)
 	nextEventDelta = 0
+	logger.debug('nextEventDelta reset to 0')
 	sectionDeltaSum += stupidOnSongOffset
-	sectionTickPointer += stupidOnSongOffset
+	logger.debug(`sectionDeltaSum: ${sectionDeltaSum}`)
+	logger.debug()
 
-	// Iterate over remaining events. First one will be shifted 16 ticks earlier to account for the section
-	// change being 16 ticks later and have it line up to the proper position
 	section.events?.filter(event => event.position !== '1.1.1').forEach(event => {
+		logger.info(`-- Event ${event.event} at ${event.position} --`)
 		if (previousEventPosition !== event.position) {
-			const eventOffsetFromSectionStart = ticksFromPosition(event.position)
-			nextEventDelta = eventOffsetFromSectionStart - sectionTickPointer
+			logger.debug('Event position changed')
+			const eventOffsetFromSectionStart = ticksFromPosition(event.position, beatsPerMeasure)
+			logger.debug(`Event offset from section start: ${eventOffsetFromSectionStart}`)
+			nextEventDelta = eventOffsetFromSectionStart - sectionDeltaSum
+			logger.debug(`nextEventDelta: ${nextEventDelta}`)
 			sectionDeltaSum += nextEventDelta
-			sectionTickPointer += nextEventDelta
+			logger.debug(`sectionDeltaSum: ${sectionDeltaSum}`)
     }
 		writeSpecEvent(event, nextEventDelta, track)
+		logger.debug(`Event written at ${nextEventDelta}`)
     previousEventPosition = event.position
+		logger.debug(`previousEventPosition set to event position: ${event.position}`)
 		nextEventDelta = 0
+		logger.debug('nextEventDelta reset to 0')
+		logger.debug()
 	})
+	logger.info('Sections done')
 
-	nextEventDelta += sectionTickLength - sectionTickPointer
+	nextEventDelta += sectionTickLength - sectionDeltaSum
+	logger.debug(`nextEventDelta: ${nextEventDelta}`)
 	sectionDeltaSum += nextEventDelta
-
-  console.log(`Section delta sum: ${sectionDeltaSum}`)
-	console.log()
+	logger.debug(`sectionDeltaSum: ${sectionDeltaSum}`)
+	logger.debug('')
 })
 
 // Stop the metronome
@@ -304,7 +335,7 @@ track.addEvent(eventFromName('rc5-clear', 0))
 
 const write = new Writer(track)
 
-console.log(JSON.stringify(track, null, 4)
+logger.verbose(JSON.stringify(track, null, 4)
                 .replaceAll('"channel": 0', '---VL3---')
                 .replaceAll('"channel": 1', '---HD500X---')
                 .replaceAll('"channel": 2', '---RC5---')
@@ -316,3 +347,39 @@ console.log(JSON.stringify(track, null, 4)
 const buffer = new Buffer.from(write.buildFile())
 const outputFile = process.argv[2].replace('.json', '.mid')
 fs.writeFileSync(outputFile, buffer)
+
+const low = new WaveFile();
+const lowBuffer = fs.readFileSync(`${__dirname}/../resources/low.wav`);
+low.fromBuffer(lowBuffer);
+const lowSamples = low.getSamples(false);
+
+const high = new WaveFile();
+const highBuffer = fs.readFileSync(`${__dirname}/../resources/high.wav`);
+high.fromBuffer(highBuffer);
+const highSamples = high.getSamples(false);
+
+const beatDuration = 60 / spec.tempo
+logger.debug(`totalMeasures: ${totalMeasures}`)
+logger.debug(`beatsPerMeasure: ${beatsPerMeasure}`)
+logger.debug(`beatDuration: ${beatDuration}`)
+logger.debug(`spec.tempo: ${spec.tempo}`)
+logger.debug(`Array size ${Math.ceil(totalMeasures * beatsPerMeasure * beatDuration * 44100)}`)
+const samplesArray = new Float64Array(Math.ceil(totalMeasures * beatsPerMeasure * beatDuration * 44100 + Math.max(lowSamples.length, highSamples.length)))
+for (let i = 0; i < samplesArray.length; i++) {
+	if (i % (Math.floor(beatDuration * 44100) * beatsPerMeasure) === 0) {
+		samplesArray.set(highSamples, i)
+	} else if (i % Math.floor(beatDuration * 44100) === 0) {
+		samplesArray.set(lowSamples, i)
+	}
+}
+
+const clickTrack = new WaveFile();
+clickTrack.fromScratch(1, 44100, '16', samplesArray)
+fs.writeFileSync('Click.wav', clickTrack.toBuffer());
+
+
+child_process.execSync(`zip -r ${process.argv[2].replace('.json', '.zip')} ${process.argv[2].replace('.json', '.mid')} Click.wav`);
+logger.info(`MIDI and click files written to ${process.argv[2].replace('.json', '.zip')}`)
+fs.unlinkSync('Click.wav');
+fs.unlinkSync(process.argv[2].replace('.json', '.mid'));
+logger.debug('midi and click files deleted')

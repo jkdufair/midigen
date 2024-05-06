@@ -8,6 +8,8 @@
   "scripts": {},
   "dependencies": {
     "midi-writer-js": "^2.1.4",
-    "tonal-midi": "^0.69.7"
+    "tonal-midi": "^0.69.7",
+    "wavefile": "^11.0.0",
+    "winston": "^3.13.0"
   }
 }

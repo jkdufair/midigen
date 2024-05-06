@@ -164,7 +164,7 @@ var Utils = /** @class */ (function () {
      * @param {(string|array)} duration
      * @return {number}
      */
-    Utils.getTickDuration = function (duration) {
+    Utils.getTickDuration = function (duration, beatsPerMeasure = 4) {
         if (Array.isArray(duration)) {
             // Recursively execute this method for each item in the array and return the sum of tick durations.
             return duration.map(function (value) {
@@ -184,7 +184,7 @@ var Utils = /** @class */ (function () {
         }
         // Need to apply duration here.  Quarter note == Constants.HEADER_CHUNK_DIVISION
         var quarterTicks = Utils.numberFromBytes(Constants.HEADER_CHUNK_DIVISION);
-        var tickDuration = quarterTicks * Utils.getDurationMultiplier(duration);
+        var tickDuration = quarterTicks * Utils.getDurationMultiplier(duration, beatsPerMeasure);
         return Utils.getRoundedIfClose(tickDuration);
     };
     /**
@@ -218,7 +218,7 @@ var Utils = /** @class */ (function () {
      * @param {string} duration
      * @return {number}
      */
-    Utils.getDurationMultiplier = function (duration) {
+    Utils.getDurationMultiplier = function (duration, beatsPerMeasure) {
         // Need to apply duration here.
         // Quarter note == Constants.HEADER_CHUNK_DIVISION ticks.
         if (duration === '0')
@@ -230,7 +230,7 @@ var Utils = /** @class */ (function () {
             var isValidBase = base === 1 || ((base & (base - 1)) === 0);
             if (isValidBase) {
                 // how much faster or slower is this note compared to a quarter?
-                var ratio = base / 4;
+                var ratio = base === 1 ? 1 / beatsPerMeasure : base / 4;
                 var durationInQuarters = 1 / ratio;
                 var _a = match.groups, dotted = _a.dotted, tuplet = _a.tuplet;
                 if (dotted) {
