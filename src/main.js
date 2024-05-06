@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 
 //#region Imports
+
 const fs = require('fs')
 const midiWriter = require('./midi-writer-js.cjs')
 const WaveFile = require('wavefile').WaveFile
 const {ControllerChangeEvent, NoteEvent, ProgramChangeEvent, Track, Utils, Writer} = midiWriter
 const child_process = require("child_process")
 const winston = require('winston')
+
 //#endregion Imports
 
 //#region Logging
+
 const logger = winston.createLogger({
 	level: 'info',
 	format: winston.format.json(),
@@ -19,6 +22,8 @@ const logger = winston.createLogger({
 		})
 	]
 })
+
+//#endregion Logging
 
 //#region Constants
 
@@ -242,6 +247,7 @@ let track = new Track()
 
 // Get the spec file
 const inputFile = process.argv[2]
+// TODO: Typescript this BS
 const spec = JSON.parse(fs.readFileSync(inputFile, 'utf8'))
 
 // Set time signature and tempo
@@ -252,8 +258,7 @@ track.setTempo(spec.tempo)
 // Initial program change for VL3 and HD500X
 track.addEvent(new ProgramChangeEvent({channel: vl3Channel - 1, instrument: spec.vl3Program - 1}))
 
-// "Main" bank on HD500X
-// TODO: Make the setlist configurable
+// "Main" bank on HD500X TODO: Make the setlist configurable
 track.addEvent(new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 0, controllerValue: 0, delta: 0}))
 track.addEvent(new ControllerChangeEvent({channel: hd500xChannel, controllerNumber: 32, controllerValue: 6, delta: 0}))
 track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: hd500xProgram(spec.hd500xProgram), delta: 0}))
@@ -261,10 +266,10 @@ track.addEvent(new ProgramChangeEvent({channel: hd500xChannel - 1, instrument: h
 // Reset RC-5
 track.addEvent(eventFromName('rc5-clear', 0))
 
-// Set delta to the start of the first measure (count off)
+// Set delta to the start of the first measure (count off) TODO: Make this configurable
 let nextEventDelta = Utils.getTickDuration(['1'], beatsPerMeasure)
-
 let totalMeasures = 1
+
 // Iterate over sections and add events
 spec.sections.forEach(section => {
 	let sectionTickLength = ticksFromLength(section.length, beatsPerMeasure)
@@ -347,6 +352,8 @@ const buffer = new Buffer.from(write.buildFile())
 const outputFile = process.argv[2].replace('.json', '.mid')
 fs.writeFileSync(outputFile, buffer)
 
+//#region Click Track
+
 const low = new WaveFile();
 const lowBuffer = fs.readFileSync(`${__dirname}/../resources/low.wav`);
 low.fromBuffer(lowBuffer);
@@ -376,6 +383,7 @@ const clickTrack = new WaveFile();
 clickTrack.fromScratch(1, 44100, '16', samplesArray)
 fs.writeFileSync('Click.wav', clickTrack.toBuffer());
 
+//#endregion Click Track
 
 child_process.execSync(`zip -r ${process.argv[2].replace('.json', '.zip')} ${process.argv[2].replace('.json', '.mid')} Click.wav`);
 logger.info(`MIDI and click files written to ${process.argv[2].replace('.json', '.zip')}`)
