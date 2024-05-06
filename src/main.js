@@ -57,7 +57,6 @@ const hd500xProgram = (programPreset) => {
 const ticksFromLength = (length, beatsPerMeasure) => {
 	const [measures, beats, subdivisions] = length.split('.').map(x => parseInt(x))
 
-	// TODO: Make sure this works with all time signatures
 	return Utils.getTickDuration('1', beatsPerMeasure) * measures +
 		Utils.getTickDuration('4', beatsPerMeasure) * beats +
 		Utils.getTickDuration('16', beatsPerMeasure) * subdivisions
