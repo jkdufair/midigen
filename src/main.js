@@ -4,10 +4,12 @@
 
 const fs = require('fs')
 const midiWriter = require('./midi-writer-js.cjs')
-const WaveFile = require('wavefile').WaveFile
 const {ControllerChangeEvent, NoteEvent, ProgramChangeEvent, Track, Utils, Writer} = midiWriter
-const child_process = require("child_process")
 const winston = require('winston')
+
+// Click track generation libs
+// const child_process = require("child_process")
+// const WaveFile = require('wavefile').WaveFile
 
 //#endregion Imports
 
@@ -243,12 +245,16 @@ const writeSpecEvent = (event, delta, track) => {
 
 //#endregion Support Functions
 
+
 let track = new Track()
 
 // Get the spec file
 const inputFile = process.argv[2]
 // TODO: Typescript this BS
 const spec = JSON.parse(fs.readFileSync(inputFile, 'utf8'))
+if (!spec.title) return
+
+logger.info(`${spec.title} (${spec.tempo} BPM)`)
 
 // Set time signature and tempo
 const [beatsPerMeasure, timeDivision] = spec.timeSignature.split('/').map(x => parseInt(x))
@@ -275,8 +281,8 @@ spec.sections.forEach(section => {
 	let sectionTickLength = ticksFromLength(section.length, beatsPerMeasure)
 	// TODO: handle sections with partial measures
 	totalMeasures += parseInt(section.length.split('.')[0])
-	logger.info(`totalMeasures: ${totalMeasures}`)
-	logger.info(`----- ${section.name}: ${sectionTickLength} -----`)
+	logger.verbose(`totalMeasures: ${totalMeasures}`)
+	logger.verbose(`----- ${section.name}: ${sectionTickLength} -----`)
 
 	let previousEventPosition = ""
 	let sectionDeltaSum = 0
@@ -284,7 +290,7 @@ spec.sections.forEach(section => {
 	// section's nextEventDelta. Rest are delta 0
 	logger.debug('1.1.1 events')
 	section.events?.filter(event => event.position === '1.1.1').forEach(event => {
-		logger.info(`-- Event ${event.event} at ${event.position} --`)
+		logger.verbose(`-- Event ${event.event} at ${event.position} --`)
 		logger.debug(`nextEventDelta: ${nextEventDelta}`)
 		writeSpecEvent(event, nextEventDelta, track)
 		nextEventDelta = 0
@@ -304,7 +310,7 @@ spec.sections.forEach(section => {
 	logger.debug()
 
 	section.events?.filter(event => event.position !== '1.1.1').forEach(event => {
-		logger.info(`-- Event ${event.event} at ${event.position} --`)
+		logger.verbose(`-- Event ${event.event} at ${event.position} --`)
 		if (previousEventPosition !== event.position) {
 			logger.debug('Event position changed')
 			const eventOffsetFromSectionStart = ticksFromPosition(event.position, beatsPerMeasure)
@@ -322,7 +328,7 @@ spec.sections.forEach(section => {
 		logger.debug('nextEventDelta reset to 0')
 		logger.debug()
 	})
-	logger.info('Sections done')
+	logger.verbose('Sections done')
 
 	nextEventDelta += sectionTickLength - sectionDeltaSum
 	logger.debug(`nextEventDelta: ${nextEventDelta}`)
@@ -351,42 +357,44 @@ logger.verbose(JSON.stringify(track, null, 4)
 const buffer = new Buffer.from(write.buildFile())
 const outputFile = process.argv[2].replace('.json', '.mid')
 fs.writeFileSync(outputFile, buffer)
+logger.verbose(`MIDI file written to ${outputFile}`)
+logger.verbose('')
 
 //#region Click Track
 
-const low = new WaveFile();
-const lowBuffer = fs.readFileSync(`${__dirname}/../resources/low.wav`);
-low.fromBuffer(lowBuffer);
-const lowSamples = low.getSamples(false);
+// const low = new WaveFile();
+// const lowBuffer = fs.readFileSync(`${__dirname}/../resources/low.wav`);
+// low.fromBuffer(lowBuffer);
+// const lowSamples = low.getSamples(false);
+//
+// const high = new WaveFile();
+// const highBuffer = fs.readFileSync(`${__dirname}/../resources/high.wav`);
+// high.fromBuffer(highBuffer);
+// const highSamples = high.getSamples(false);
+//
+// const beatDuration = 60 / spec.tempo
+// logger.debug(`totalMeasures: ${totalMeasures}`)
+// logger.debug(`beatsPerMeasure: ${beatsPerMeasure}`)
+// logger.debug(`beatDuration: ${beatDuration}`)
+// logger.debug(`spec.tempo: ${spec.tempo}`)
+// logger.debug(`Array size ${Math.ceil(totalMeasures * beatsPerMeasure * beatDuration * 44100)}`)
+// const samplesArray = new Float64Array(Math.ceil(totalMeasures * beatsPerMeasure * beatDuration * 44100 + Math.max(lowSamples.length, highSamples.length)))
+// for (let i = 0; i < samplesArray.length; i++) {
+// 	if (i % (Math.floor(beatDuration * 44100) * beatsPerMeasure) === 0) {
+// 		samplesArray.set(highSamples, i)
+// 	} else if (i % Math.floor(beatDuration * 44100) === 0) {
+// 		samplesArray.set(lowSamples, i)
+// 	}
+// }
 
-const high = new WaveFile();
-const highBuffer = fs.readFileSync(`${__dirname}/../resources/high.wav`);
-high.fromBuffer(highBuffer);
-const highSamples = high.getSamples(false);
-
-const beatDuration = 60 / spec.tempo
-logger.debug(`totalMeasures: ${totalMeasures}`)
-logger.debug(`beatsPerMeasure: ${beatsPerMeasure}`)
-logger.debug(`beatDuration: ${beatDuration}`)
-logger.debug(`spec.tempo: ${spec.tempo}`)
-logger.debug(`Array size ${Math.ceil(totalMeasures * beatsPerMeasure * beatDuration * 44100)}`)
-const samplesArray = new Float64Array(Math.ceil(totalMeasures * beatsPerMeasure * beatDuration * 44100 + Math.max(lowSamples.length, highSamples.length)))
-for (let i = 0; i < samplesArray.length; i++) {
-	if (i % (Math.floor(beatDuration * 44100) * beatsPerMeasure) === 0) {
-		samplesArray.set(highSamples, i)
-	} else if (i % Math.floor(beatDuration * 44100) === 0) {
-		samplesArray.set(lowSamples, i)
-	}
-}
-
-const clickTrack = new WaveFile();
-clickTrack.fromScratch(1, 44100, '16', samplesArray)
-fs.writeFileSync('Click.wav', clickTrack.toBuffer());
+// const clickTrack = new WaveFile();
+// clickTrack.fromScratch(1, 44100, '16', samplesArray)
+// fs.writeFileSync('Click.wav', clickTrack.toBuffer());
 
 //#endregion Click Track
 
-child_process.execSync(`zip -r ${process.argv[2].replace('.json', '.zip')} ${process.argv[2].replace('.json', '.mid')} Click.wav`);
-logger.info(`MIDI and click files written to ${process.argv[2].replace('.json', '.zip')}`)
-fs.unlinkSync('Click.wav');
-fs.unlinkSync(process.argv[2].replace('.json', '.mid'));
-logger.debug('midi and click files deleted')
+// child_process.execSync(`zip -r ${process.argv[2].replace('.json', '.zip')} ${process.argv[2].replace('.json', '.mid')} Click.wav`);
+// logger.verbose(`MIDI and click files written to ${process.argv[2].replace('.json', '.zip')}`)
+// fs.unlinkSync('Click.wav');
+// fs.unlinkSync(process.argv[2].replace('.json', '.mid'));
+// logger.debug('midi and click files deleted')
