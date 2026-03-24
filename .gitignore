@@ -129,6 +129,8 @@ dist
 .yarn/install-state.gz
 .pnp.*
 example.mid
-web/dev.db
-web/.next/
-web/node_modules/
+packages/web/dev.db
+packages/web/prisma/dev.db
+packages/web/.next/
+packages/*/node_modules/
+node_modules/

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db'
 import { NextRequest } from 'next/server'
-import type { EventTypeConfig, SongSpec } from '@/lib/types'
+import type { EventTypeConfig, SongSpec } from '@midigen/core'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   // generateMidi is a CommonJS module — import dynamically to avoid ESM/CJS conflict
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { generateMidi } = require('@/lib/midi-generator')
+  const { generateMidi } = require('@midigen/core')
   const buffer: Buffer = generateMidi(spec, eventTypes)
 
   const filename = `${spec.title.replace(/[^a-z0-9]/gi, '_')}.mid`

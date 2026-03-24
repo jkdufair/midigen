@@ -2,8 +2,8 @@
 
 const fs = require('fs')
 const path = require('path')
-const { generateMidi } = require('./lib/midi-generator')
-const { defaultEventTypes } = require('./lib/default-event-types')
+const { generateMidi } = require('@midigen/core')
+const { defaultEventTypes } = require('@midigen/core')
 
 const inputFile = process.argv[2]
 if (!inputFile) {

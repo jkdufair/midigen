@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@midigen/core": "*",
     "@prisma/adapter-better-sqlite3": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@types/better-sqlite3": "^7.6.13",
