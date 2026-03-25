@@ -10,6 +10,31 @@ export interface EventTypeConfig {
   valueOffset?: number | null
   instrumentOffset?: number | null
   hasParameter: boolean
+  /** Fire this event automatically at each section boundary */
+  onSectionChange?: boolean
+  /** Fire this event automatically at the end of the song */
+  onSongEnd?: boolean
+}
+
+export interface GearLibraryEventType {
+  slug: string
+  label: string
+  messageType: MessageType
+  ccNumber?: number | null
+  ccValue?: number | null
+  valueOffset?: number | null
+  instrumentOffset?: number | null
+  hasParameter: boolean
+  onSectionChange?: boolean
+  onSongEnd?: boolean
+}
+
+export interface GearLibraryEntry {
+  key: string
+  name: string
+  midiChannel: number
+  color: string
+  eventTypes: GearLibraryEventType[]
 }
 
 export interface SongEvent {

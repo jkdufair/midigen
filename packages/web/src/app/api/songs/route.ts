@@ -9,6 +9,15 @@ export async function GET() {
   return Response.json(songs)
 }
 
+export async function DELETE(req: NextRequest) {
+  const { ids } = await req.json()
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return Response.json({ error: 'ids array required' }, { status: 400 })
+  }
+  const { count } = await prisma.song.deleteMany({ where: { id: { in: ids } } })
+  return Response.json({ deleted: count })
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const { title, tempo, timeSignature, sections } = body

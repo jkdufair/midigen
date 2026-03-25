@@ -14,6 +14,8 @@ interface EventTypeItem {
   valueOffset: number | null
   instrumentOffset: number | null
   hasParameter: boolean
+  onSectionChange: boolean
+  onSongEnd: boolean
   gear: { id: string; name: string; color: string | null }
 }
 
@@ -29,11 +31,14 @@ interface EventForm {
   valueOffset: string
   instrumentOffset: string
   hasParameter: boolean
+  onSectionChange: boolean
+  onSongEnd: boolean
 }
 
 const EMPTY_FORM: EventForm = {
   slug: '', label: '', gearId: '', messageType: 'CC',
   ccNumber: '0', ccValue: '127', valueOffset: '0', instrumentOffset: '0', hasParameter: false,
+  onSectionChange: false, onSongEnd: false,
 }
 
 function slugify(s: string) {
@@ -66,6 +71,8 @@ export default function EventsPage() {
       valueOffset: String(item.valueOffset ?? 0),
       instrumentOffset: String(item.instrumentOffset ?? 0),
       hasParameter: item.hasParameter,
+      onSectionChange: item.onSectionChange,
+      onSongEnd: item.onSongEnd,
     })
   }
 
@@ -86,6 +93,8 @@ export default function EventsPage() {
       valueOffset: form.messageType === 'CC_PARAM_VALUE' ? Number(form.valueOffset) : null,
       instrumentOffset: form.messageType === 'PC' ? Number(form.instrumentOffset) : null,
       hasParameter: form.hasParameter,
+      onSectionChange: form.onSectionChange,
+      onSongEnd: form.onSongEnd,
     }
     const res = editing === 'new'
       ? await fetch('/api/config/event-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -197,11 +206,25 @@ export default function EventsPage() {
               </div>
             )}
 
-            <div className="col-span-2 flex items-center gap-2 pt-1">
-              <input type="checkbox" id="hasParam" checked={form.hasParameter}
-                onChange={e => setForm(f => ({ ...f, hasParameter: e.target.checked }))}
-                className="rounded" />
-              <label htmlFor="hasParam" className="text-sm text-gray-300">Has parameter (shown in song editor)</label>
+            <div className="col-span-2 flex items-center gap-4 pt-1">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-300">
+                <input type="checkbox" checked={form.hasParameter}
+                  onChange={e => setForm(f => ({ ...f, hasParameter: e.target.checked }))}
+                  className="rounded" />
+                Has parameter
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-300">
+                <input type="checkbox" checked={form.onSectionChange}
+                  onChange={e => setForm(f => ({ ...f, onSectionChange: e.target.checked }))}
+                  className="rounded" />
+                On section change
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-300">
+                <input type="checkbox" checked={form.onSongEnd}
+                  onChange={e => setForm(f => ({ ...f, onSongEnd: e.target.checked }))}
+                  className="rounded" />
+                On song end
+              </label>
             </div>
           </div>
           <div className="flex gap-3">
@@ -231,6 +254,8 @@ export default function EventsPage() {
                     {item.messageType === 'CC_PARAM_VALUE' && <span className="text-xs text-gray-500 shrink-0">CC#{item.ccNumber} val=param{item.valueOffset !== 0 ? `${item.valueOffset ?? ''}` : ''}</span>}
                     {item.messageType === 'PC' && <span className="text-xs text-gray-500 shrink-0">PC inst=param{item.instrumentOffset !== 0 ? `${item.instrumentOffset ?? ''}` : ''}</span>}
                     {item.hasParameter && <span className="text-xs text-amber-600 shrink-0">param</span>}
+                    {item.onSectionChange && <span className="text-xs text-cyan-500 shrink-0">section</span>}
+                    {item.onSongEnd && <span className="text-xs text-purple-400 shrink-0">end</span>}
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-4">
                     <button onClick={() => startEdit(item)} className="text-sm text-gray-400 hover:text-white transition-colors">Edit</button>

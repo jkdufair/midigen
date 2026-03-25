@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
-  const { slug, label, gearId, messageType, ccNumber, ccValue, valueOffset, instrumentOffset, hasParameter } = body
+  const { slug, label, gearId, messageType, ccNumber, ccValue, valueOffset, instrumentOffset, hasParameter, onSectionChange, onSongEnd } = body
   const et = await prisma.eventType.update({
     where: { id },
     data: {
@@ -21,6 +21,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       valueOffset: valueOffset != null ? Number(valueOffset) : null,
       instrumentOffset: instrumentOffset != null ? Number(instrumentOffset) : null,
       hasParameter: Boolean(hasParameter),
+      onSectionChange: Boolean(onSectionChange),
+      onSongEnd: Boolean(onSongEnd),
     },
     include: { gear: true },
   })

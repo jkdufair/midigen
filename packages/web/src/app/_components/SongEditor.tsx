@@ -62,7 +62,7 @@ export default function SongEditor({ songId }: Props) {
           title: song.title,
           tempo: String(song.tempo),
           timeSignature: song.timeSignature,
-          sections: song.sections,
+          sections: (song.sections ?? []).map((s: any) => ({ ...s, events: s.events ?? [] })),
         })
       })
     }
@@ -267,7 +267,7 @@ export default function SongEditor({ songId }: Props) {
 
               {/* Events */}
               <div className="space-y-2 pl-2 border-l border-gray-700">
-                {section.events.map((ev, ei) => {
+                {(section.events ?? []).map((ev, ei) => {
                   const evType = et[ev.event]
                   return (
                     <div key={ei} className="flex items-center gap-2">

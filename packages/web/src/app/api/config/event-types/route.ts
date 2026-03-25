@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { slug, label, gearId, messageType, ccNumber, ccValue, valueOffset, instrumentOffset, hasParameter } = body
+  const { slug, label, gearId, messageType, ccNumber, ccValue, valueOffset, instrumentOffset, hasParameter, onSectionChange, onSongEnd } = body
   if (!slug || !label || !gearId || !messageType) {
     return Response.json({ error: 'slug, label, gearId, and messageType required' }, { status: 400 })
   }
@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
       valueOffset: valueOffset != null ? Number(valueOffset) : null,
       instrumentOffset: instrumentOffset != null ? Number(instrumentOffset) : null,
       hasParameter: Boolean(hasParameter),
+      onSectionChange: Boolean(onSectionChange),
+      onSongEnd: Boolean(onSongEnd),
     },
     include: { gear: true },
   })

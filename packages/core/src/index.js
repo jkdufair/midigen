@@ -2,5 +2,5 @@
 
 module.exports = {
   ...require('./midi-generator'),
-  ...require('./default-event-types'),
+  ...require('./gear-library'),
 }
