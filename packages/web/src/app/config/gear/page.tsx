@@ -180,22 +180,39 @@ export default function GearPage() {
         </div>
       )}
 
-      <div className="divide-y divide-gray-800 rounded-lg border border-gray-800 bg-gray-900">
-        {gear.length === 0 && <p className="px-4 py-3 text-sm text-gray-400">No gear configured.</p>}
-        {gear.map(item => (
-          <div key={item.id} className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: item.color ?? '#6366f1' }} />
-              <span className="font-medium">{item.name}</span>
-              <span className="text-sm text-gray-400">Ch {item.midiChannel}</span>
-              <span className="text-xs text-gray-500">{item._count.eventTypes} event{item._count.eventTypes !== 1 ? 's' : ''}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => startEdit(item)} className="text-sm text-gray-400 hover:text-white transition-colors">Edit</button>
-              <button onClick={() => deleteGear(item.id, item.name)} className="text-sm text-red-500 hover:text-red-400 transition-colors">Delete</button>
-            </div>
-          </div>
-        ))}
+      <div className="rounded-lg border border-gray-800 bg-gray-900">
+        {gear.length === 0 ? <p className="px-4 py-3 text-sm text-gray-400">No gear configured.</p> : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-800 text-left text-xs text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-2 w-16">Ch</th>
+                <th className="px-4 py-2">Name</th>
+                <th className="px-4 py-2 w-24">Events</th>
+                <th className="px-4 py-2 w-32 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {gear.map(item => (
+                <tr key={item.id}>
+                  <td className="px-4 py-3 font-mono text-gray-400">{item.midiChannel}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: item.color ?? '#6366f1' }} />
+                      <Link href={`/config/events?gear=${item.id}`} className="font-medium hover:text-indigo-400 transition-colors">{item.name}</Link>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">{item._count.eventTypes}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-3">
+                      <button onClick={() => startEdit(item)} className="text-gray-400 hover:text-white transition-colors">Edit</button>
+                      <button onClick={() => deleteGear(item.id, item.name)} className="text-red-500 hover:text-red-400 transition-colors">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 export async function GET() {
   const gear = await prisma.gear.findMany({
     include: { _count: { select: { eventTypes: true } } },
-    orderBy: { name: 'asc' },
+    orderBy: { midiChannel: 'asc' },
   })
   return Response.json(gear)
 }
