@@ -64,7 +64,7 @@ export default function SongEditor({ songId }: Props) {
           title: song.title,
           tempo: String(song.tempo),
           timeSignature: song.timeSignature,
-          sections: (song.sections ?? []).map((s: any) => ({ ...s, events: s.events ?? [] })),
+          sections: (song.sections ?? []).map((s: Section) => ({ ...s, events: s.events ?? [] })),
         })
       })
     }
@@ -78,6 +78,7 @@ export default function SongEditor({ songId }: Props) {
   }), [form])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (jsonView) setJsonText(JSON.stringify(formToSpec(), null, 2))
   }, [jsonView, formToSpec])
 

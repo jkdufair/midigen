@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { gearLibrary } = require('@midigen/core')
 
 interface BuiltinGear {
@@ -26,7 +27,7 @@ export async function POST() {
         name: entry.name,
         midiChannel: entry.midiChannel,
         color: entry.color,
-        eventTypes: entry.eventTypes,
+        eventTypes: entry.eventTypes as object[],
       },
     })
     created.push(entry.name)

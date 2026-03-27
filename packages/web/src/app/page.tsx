@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -50,6 +50,7 @@ export default function SongsPage() {
   const [publishStatus, setPublishStatus] = useState<{ id: string; ok: boolean; message: string } | null>(null)
   const [bulkPublishing, setBulkPublishing] = useState<string | null>(null)
   const [publishSummary, setPublishSummary] = useState<PublishSummary | null>(null)
+  const publishAbortRef = useRef<AbortController | null>(null)
   const router = useRouter()
 
   const displayed = useMemo(() => {
@@ -204,26 +205,37 @@ export default function SongsPage() {
   }
 
   async function bulkPublishToOnsong() {
-    const selectedSongs = songs.filter(s => selected.has(s.id))
+    const abort = new AbortController()
+    publishAbortRef.current = abort
+    const selectedSongs = songs.filter(s => selected.has(s.id)).sort((a, b) => a.title.localeCompare(b.title))
     const results: PublishResult[] = []
     let published = 0
     let errors = 0
     for (const song of selectedSongs) {
+      if (abort.signal.aborted) break
       setBulkPublishing(song.title)
-      const res = await fetch('/api/publish/onsong', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ songId: song.id }),
-      })
-      if (res.ok) {
-        results.push({ title: song.title, status: 'ok', message: 'Published' })
-        published++
-      } else {
-        const data = await res.json().catch(() => ({ error: 'Unknown error' }))
-        results.push({ title: song.title, status: 'error', message: data.error ?? 'Failed' })
+      try {
+        const res = await fetch('/api/publish/onsong', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ songId: song.id }),
+          signal: abort.signal,
+        })
+        if (res.ok) {
+          results.push({ title: song.title, status: 'ok', message: 'Published' })
+          published++
+        } else {
+          const data = await res.json().catch(() => ({ error: 'Unknown error' }))
+          results.push({ title: song.title, status: 'error', message: data.error ?? 'Failed' })
+          errors++
+        }
+      } catch (e) {
+        if (abort.signal.aborted) break
+        results.push({ title: song.title, status: 'error', message: e instanceof Error ? e.message : 'Failed' })
         errors++
       }
     }
+    publishAbortRef.current = null
     setBulkPublishing(null)
     setPublishSummary({ published, errors, results })
   }
@@ -369,7 +381,15 @@ export default function SongsPage() {
               Clear selection
             </button>
             {bulkPublishing && (
-              <span className="ml-auto text-sm text-sky-400">Publishing &quot;{bulkPublishing}&quot;…</span>
+              <span className="ml-auto flex items-center gap-2 text-sm text-sky-400">
+                Publishing &quot;{bulkPublishing}&quot;…
+                <button
+                  onClick={() => publishAbortRef.current?.abort()}
+                  className="rounded border border-gray-600 px-2 py-0.5 text-xs text-gray-400 hover:text-white hover:border-gray-400 transition-colors"
+                >
+                  Stop
+                </button>
+              </span>
             )}
           </div>
         )}

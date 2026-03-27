@@ -306,7 +306,7 @@ export default function GearLibraryPage() {
                   </div>
                 </div>
               ))}
-              {events.length === 0 && <p className="text-sm text-gray-500">No event types yet. Click "+ Add Event Type" above.</p>}
+              {events.length === 0 && <p className="text-sm text-gray-500">No event types yet. Click &quot;+ Add Event Type&quot; above.</p>}
             </div>
           </div>
 
@@ -322,7 +322,7 @@ export default function GearLibraryPage() {
       {/* Template list */}
       <div className="space-y-3">
         {templates.length === 0 && (
-          <p className="text-sm text-gray-400">No gear templates yet. Click "Load Built-ins" to import presets or create your own.</p>
+          <p className="text-sm text-gray-400">No gear templates yet. Click &quot;Load Built-ins&quot; to import presets or create your own.</p>
         )}
         {templates.map(t => (
           <div key={t.id} className="rounded-lg border border-gray-800 bg-gray-900">
