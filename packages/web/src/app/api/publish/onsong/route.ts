@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const buffer: Buffer = generateMidi(spec, eventTypes)
 
   try {
-    await publishMidi(spec.title, buffer)
+    await publishMidi(spec.title, buffer, spec.tempo)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return Response.json({ error: message }, { status: 502 })

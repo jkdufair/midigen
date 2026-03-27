@@ -88,23 +88,38 @@ async function getToken(host: string, port: number, uuid: string, apiKey: string
   return token
 }
 
-export async function publishMidi(title: string, midiBuffer: Buffer): Promise<void> {
+export async function publishMidi(title: string, midiBuffer: Buffer, tempo?: number): Promise<void> {
   const { uuid, apiKey } = getConfig()
 
   const { host, port } = await discoverDevice()
   const token = await getToken(host, port, uuid, apiKey)
+  const baseUrl = `http://${host}:${port}/api/${token}`
 
+  // Upload the MIDI file
   const filename = `${title}.mid`
-  const url = `http://${host}:${port}/api/${token}/songs/import`
-
   const form = new FormData()
   form.append('file1', new Blob([midiBuffer], { type: 'audio/midi' }), filename)
 
-  const res = await fetch(url, { method: 'POST', body: form })
+  const uploadRes = await fetch(`${baseUrl}/songs/import`, { method: 'POST', body: form })
+  if (!uploadRes.ok) {
+    const text = await uploadRes.text()
+    throw new Error(`OnSong upload failed: ${uploadRes.status} ${text}`)
+  }
 
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`OnSong upload failed: ${res.status} ${text}`)
+  // Set tempo on the song if provided
+  if (tempo) {
+    const songsRes = await fetch(`${baseUrl}/songs`)
+    if (songsRes.ok) {
+      const data = await songsRes.json() as { results?: { ID: string; title: string }[] }
+      const song = data.results?.find(s => s.title === title)
+      if (song) {
+        await fetch(`${baseUrl}/songs/${song.ID}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tempo }),
+        })
+      }
+    }
   }
 }
 

@@ -48,7 +48,7 @@ export default function SongsPage() {
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null)
   const [publishingId, setPublishingId] = useState<string | null>(null)
   const [publishStatus, setPublishStatus] = useState<{ id: string; ok: boolean; message: string } | null>(null)
-  const [bulkPublishing, setBulkPublishing] = useState(false)
+  const [bulkPublishing, setBulkPublishing] = useState<string | null>(null)
   const [publishSummary, setPublishSummary] = useState<PublishSummary | null>(null)
   const router = useRouter()
 
@@ -204,12 +204,12 @@ export default function SongsPage() {
   }
 
   async function bulkPublishToOnsong() {
-    setBulkPublishing(true)
     const selectedSongs = songs.filter(s => selected.has(s.id))
     const results: PublishResult[] = []
     let published = 0
     let errors = 0
     for (const song of selectedSongs) {
+      setBulkPublishing(song.title)
       const res = await fetch('/api/publish/onsong', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -224,7 +224,7 @@ export default function SongsPage() {
         errors++
       }
     }
-    setBulkPublishing(false)
+    setBulkPublishing(null)
     setPublishSummary({ published, errors, results })
   }
 
@@ -347,14 +347,14 @@ export default function SongsPage() {
         </div>
 
         {selected.size > 0 && (
-          <div className="flex items-center gap-3 mb-3 rounded border border-red-900 bg-red-950/50 px-4 py-2">
+          <div className="flex items-center gap-3 mb-3 rounded border border-gray-700 bg-gray-900 px-4 py-2">
             <span className="text-sm text-gray-300">{selected.size} selected</span>
             <button
               onClick={bulkPublishToOnsong}
-              disabled={bulkPublishing}
+              disabled={!!bulkPublishing}
               className="rounded bg-sky-700 px-3 py-1 text-sm font-medium hover:bg-sky-600 disabled:opacity-50 transition-colors"
             >
-              {bulkPublishing ? 'Publishing…' : '→ OnSong'}
+              → OnSong
             </button>
             <button
               onClick={bulkDelete}
@@ -368,6 +368,9 @@ export default function SongsPage() {
             >
               Clear selection
             </button>
+            {bulkPublishing && (
+              <span className="ml-auto text-sm text-sky-400">Publishing &quot;{bulkPublishing}&quot;…</span>
+            )}
           </div>
         )}
 
