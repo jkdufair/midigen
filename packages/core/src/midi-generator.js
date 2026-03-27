@@ -8,8 +8,8 @@
 const midiWriter = require('./midi-writer-js.cjs')
 const { ControllerChangeEvent, ProgramChangeEvent, Track, Utils, Writer } = midiWriter
 
-// OnSong section-change CC must be sent slightly after any 1.1.1 events or OnSong misses it
-const ONSONG_SECTION_CHANGE_OFFSET_TICKS = 16
+// Section-change events fire slightly after any 1.1.1 events
+const SECTION_CHANGE_OFFSET_TICKS = 16
 
 /**
  * @param {string} length - "measures.beats.subdivisions"
@@ -32,7 +32,6 @@ function ticksFromLength(length, beatsPerMeasure) {
  */
 function ticksFromPosition(position, beatsPerMeasure) {
 	const [measures, beats, subdivisions] = position.split('.').map(x => parseInt(x))
-	// 1-based: 1.1.1 = start of section, 8.4.4 = 8th measure 4th beat 4th 16th note
 	return (
 		Utils.getTickDuration('1', beatsPerMeasure) * (measures - 1) +
 		Utils.getTickDuration('4', beatsPerMeasure) * (beats - 1) +
@@ -81,7 +80,7 @@ function buildMidiEvent(eventType, delta, parameter) {
  */
 function writeSpecEvent(eventSlug, parameter, delta, track, eventTypes) {
 	const eventType = eventTypes.find(et => et.slug === eventSlug)
-	if (!eventType) throw new Error(`Unknown event type: "${eventSlug}"`)
+	if (!eventType) return // silently skip — validation happens at import time
 	track.addEvent(buildMidiEvent(eventType, delta, parameter))
 }
 
@@ -101,6 +100,9 @@ function generateMidi(spec, eventTypes) {
 	track.setTimeSignature(beatsPerMeasure, timeDivision)
 	track.setTempo(spec.tempo)
 
+	const sectionChangeEvents = eventTypes.filter(et => et.onSectionChange)
+	const songEndEvents = eventTypes.filter(et => et.onSongEnd)
+
 	// Start delta at 1 measure (count-off before the song begins)
 	let nextEventDelta = Utils.getTickDuration(['1'], beatsPerMeasure)
 
@@ -115,12 +117,16 @@ function generateMidi(spec, eventTypes) {
 			nextEventDelta = 0
 		}
 
-		// OnSong section-change CC fires slightly after 1.1.1 events
-		const onSongEventType = eventTypes.find(et => et.slug === 'onsong-next-section')
-		if (!onSongEventType) throw new Error('No "onsong-next-section" event type found in config')
-		track.addEvent(buildMidiEvent(onSongEventType, nextEventDelta + ONSONG_SECTION_CHANGE_OFFSET_TICKS))
-		nextEventDelta = 0
-		sectionDeltaSum += ONSONG_SECTION_CHANGE_OFFSET_TICKS
+		// Section-change events fire slightly after 1.1.1 events
+		if (sectionChangeEvents.length > 0) {
+			let first = true
+			for (const et of sectionChangeEvents) {
+				track.addEvent(buildMidiEvent(et, first ? nextEventDelta + SECTION_CHANGE_OFFSET_TICKS : 0))
+				first = false
+			}
+			nextEventDelta = 0
+			sectionDeltaSum += SECTION_CHANGE_OFFSET_TICKS
+		}
 
 		// Remaining events sorted by position
 		for (const event of (section.events ?? []).filter(e => e.position !== '1.1.1')) {
@@ -137,10 +143,14 @@ function generateMidi(spec, eventTypes) {
 		nextEventDelta += sectionTickLength - sectionDeltaSum
 	}
 
-	// Stop the metronome at the end
-	const metronomeStopType = eventTypes.find(et => et.slug === 'metronome-stop')
-	if (!metronomeStopType) throw new Error('No "metronome-stop" event type found in config')
-	track.addEvent(buildMidiEvent(metronomeStopType, nextEventDelta))
+	// Song-end events
+	if (songEndEvents.length > 0) {
+		let first = true
+		for (const et of songEndEvents) {
+			track.addEvent(buildMidiEvent(et, first ? nextEventDelta : 0))
+			first = false
+		}
+	}
 
 	const write = new Writer(track)
 	return Buffer.from(write.buildFile())

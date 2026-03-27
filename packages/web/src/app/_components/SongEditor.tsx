@@ -64,7 +64,7 @@ export default function SongEditor({ songId }: Props) {
           title: song.title,
           tempo: String(song.tempo),
           timeSignature: song.timeSignature,
-          sections: song.sections,
+          sections: (song.sections ?? []).map((s: any) => ({ ...s, events: s.events ?? [] })),
         })
       })
     }
@@ -274,30 +274,57 @@ export default function SongEditor({ songId }: Props) {
                   onChange={e => updateSection(si, 'name', e.target.value)}
                   placeholder="Section name (Verse 1, Chorus…)"
                 />
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs text-gray-400">Length</label>
-                  <input
-                    className="w-28 rounded bg-gray-800 px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    value={section.length}
-                    onChange={e => updateSection(si, 'length', e.target.value)}
-                    placeholder="8.0.0"
-                  />
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-gray-400 mr-1">Length</label>
+                  {(() => {
+                    const [bars = '8', beats = '0', subs = '0'] = section.length.split('.')
+                    const setLen = (b: string, bt: string, s: string) => updateSection(si, 'length', `${b}.${bt}.${s}`)
+                    return (<>
+                      <div className="flex flex-col items-center">
+                        <input type="number" min={0} className="w-12 rounded bg-gray-800 px-1.5 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          value={bars} onChange={e => setLen(e.target.value, beats, subs)} />
+                        <span className="text-[10px] text-gray-500">bar</span>
+                      </div>
+                      <span className="text-gray-600 font-mono">.</span>
+                      <div className="flex flex-col items-center">
+                        <input type="number" min={0} className="w-12 rounded bg-gray-800 px-1.5 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          value={beats} onChange={e => setLen(bars, e.target.value, subs)} />
+                        <span className="text-[10px] text-gray-500">beat</span>
+                      </div>
+                      <span className="text-gray-600 font-mono">.</span>
+                      <div className="flex flex-col items-center">
+                        <input type="number" min={0} className="w-12 rounded bg-gray-800 px-1.5 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          value={subs} onChange={e => setLen(bars, beats, e.target.value)} />
+                        <span className="text-[10px] text-gray-500">sub</span>
+                      </div>
+                    </>)
+                  })()}
                 </div>
                 <button onClick={() => removeSection(si)} className="text-red-500 hover:text-red-400 text-sm">✕</button>
               </div>
 
               {/* Events */}
               <div className="space-y-2 pl-2 border-l border-gray-700">
-                {section.events.map((ev, ei) => {
+                {(section.events ?? []).map((ev, ei) => {
                   const evType = et[ev.event]
                   return (
                     <div key={ei} className="flex items-center gap-2">
-                      <input
-                        className="w-24 rounded bg-gray-800 px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        value={ev.position}
-                        onChange={e => updateEvent(si, ei, { position: e.target.value })}
-                        placeholder="1.1.1"
-                      />
+                      {(() => {
+                        const [bar = '1', beat = '1', sub = '1'] = ev.position.split('.')
+                        const setPos = (b: string, bt: string, s: string) => updateEvent(si, ei, { position: `${b}.${bt}.${s}` })
+                        return (
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <input type="number" min={1} className="w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              value={bar} onChange={e => setPos(e.target.value, beat, sub)} title="Bar" />
+                            <span className="text-gray-600 font-mono text-xs">.</span>
+                            <input type="number" min={1} className="w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              value={beat} onChange={e => setPos(bar, e.target.value, sub)} title="Beat" />
+                            <span className="text-gray-600 font-mono text-xs">.</span>
+                            <input type="number" min={1} className="w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              value={sub} onChange={e => setPos(bar, beat, e.target.value)} title="Sub" />
+                          </div>
+                        )
+                      })()}
                       <select
                         className="flex-1 rounded bg-gray-800 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         value={ev.event}

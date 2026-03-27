@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
     valueOffset: et.valueOffset,
     instrumentOffset: et.instrumentOffset,
     hasParameter: et.hasParameter,
+    onSectionChange: et.onSectionChange,
+    onSongEnd: et.onSongEnd,
   }))
 
   // generateMidi is a CommonJS module — import dynamically to avoid ESM/CJS conflict
