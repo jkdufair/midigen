@@ -15,6 +15,8 @@ interface SongSummary {
 export default function SongsPage() {
   const [songs, setSongs] = useState<SongSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [publishingId, setPublishingId] = useState<string | null>(null)
+  const [publishStatus, setPublishStatus] = useState<{ id: string; ok: boolean; message: string } | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -38,9 +40,27 @@ export default function SongsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${title.replace(/[^a-z0-9]/gi, '_')}.mid`
+    a.download = `${title}.mid`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  async function publishToOnsong(id: string) {
+    setPublishingId(id)
+    setPublishStatus(null)
+    const res = await fetch('/api/publish/onsong', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ songId: id }),
+    })
+    setPublishingId(null)
+    const data = await res.json()
+    if (res.ok) {
+      setPublishStatus({ id, ok: true, message: 'Sent!' })
+      setTimeout(() => setPublishStatus(null), 3000)
+    } else {
+      setPublishStatus({ id, ok: false, message: data.error ?? 'Publish failed' })
+    }
   }
 
   return (
@@ -71,6 +91,18 @@ export default function SongsPage() {
                 >
                   ↓ MIDI
                 </button>
+                <button
+                  onClick={() => publishToOnsong(song.id)}
+                  disabled={publishingId === song.id}
+                  className="text-sm text-sky-400 hover:text-sky-300 disabled:opacity-50 transition-colors"
+                >
+                  {publishingId === song.id ? 'Publishing…' : '→ OnSong'}
+                </button>
+                {publishStatus?.id === song.id && (
+                  <span className={`text-sm ${publishStatus.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {publishStatus.message}
+                  </span>
+                )}
                 <button
                   onClick={() => router.push(`/songs/${song.id}`)}
                   className="text-sm text-gray-400 hover:text-white transition-colors"

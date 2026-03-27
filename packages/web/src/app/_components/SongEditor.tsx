@@ -49,6 +49,8 @@ export default function SongEditor({ songId }: Props) {
   const [eventTypes, setEventTypes] = useState<EventTypeSummary[]>([])
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [publishStatus, setPublishStatus] = useState<{ ok: boolean; message: string } | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -176,9 +178,28 @@ export default function SongEditor({ songId }: Props) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${form.title.replace(/[^a-z0-9]/gi, '_') || 'song'}.mid`
+    a.download = `${form.title || 'song'}.mid`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  async function publishToOnsong() {
+    setPublishing(true)
+    setPublishStatus(null)
+    const spec = formToSpec()
+    const res = await fetch('/api/publish/onsong', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(spec),
+    })
+    setPublishing(false)
+    const data = await res.json()
+    if (res.ok) {
+      setPublishStatus({ ok: true, message: 'Sent to OnSong!' })
+      setTimeout(() => setPublishStatus(null), 3000)
+    } else {
+      setPublishStatus({ ok: false, message: data.error ?? 'Publish failed' })
+    }
   }
 
   const et = eventTypes.reduce<Record<string, EventTypeSummary>>((acc, e) => { acc[e.slug] = e; return acc }, {})
@@ -320,7 +341,7 @@ export default function SongEditor({ songId }: Props) {
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex flex-wrap items-center gap-3 pt-2">
         <button
           onClick={save}
           disabled={saving}
@@ -335,6 +356,18 @@ export default function SongEditor({ songId }: Props) {
         >
           {generating ? 'Generating…' : '↓ Generate MIDI'}
         </button>
+        <button
+          onClick={publishToOnsong}
+          disabled={publishing}
+          className="rounded bg-sky-700 px-5 py-2 text-sm font-medium hover:bg-sky-600 disabled:opacity-50 transition-colors"
+        >
+          {publishing ? 'Publishing…' : '→ OnSong'}
+        </button>
+        {publishStatus && (
+          <span className={`text-sm ${publishStatus.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+            {publishStatus.message}
+          </span>
+        )}
         <button onClick={() => router.push('/')} className="text-sm text-gray-400 hover:text-white transition-colors">
           Cancel
         </button>
