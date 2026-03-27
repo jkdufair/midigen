@@ -27,6 +27,18 @@ interface ImportSummary {
   results: ImportResult[]
 }
 
+interface PublishResult {
+  title: string
+  status: 'ok' | 'error'
+  message: string
+}
+
+interface PublishSummary {
+  published: number
+  errors: number
+  results: PublishResult[]
+}
+
 export default function SongsPage() {
   const [songs, setSongs] = useState<SongSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -36,6 +48,8 @@ export default function SongsPage() {
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null)
   const [publishingId, setPublishingId] = useState<string | null>(null)
   const [publishStatus, setPublishStatus] = useState<{ id: string; ok: boolean; message: string } | null>(null)
+  const [bulkPublishing, setBulkPublishing] = useState(false)
+  const [publishSummary, setPublishSummary] = useState<PublishSummary | null>(null)
   const router = useRouter()
 
   const displayed = useMemo(() => {
@@ -189,6 +203,31 @@ export default function SongsPage() {
     }
   }
 
+  async function bulkPublishToOnsong() {
+    setBulkPublishing(true)
+    const selectedSongs = songs.filter(s => selected.has(s.id))
+    const results: PublishResult[] = []
+    let published = 0
+    let errors = 0
+    for (const song of selectedSongs) {
+      const res = await fetch('/api/publish/onsong', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ songId: song.id }),
+      })
+      if (res.ok) {
+        results.push({ title: song.title, status: 'ok', message: 'Published' })
+        published++
+      } else {
+        const data = await res.json().catch(() => ({ error: 'Unknown error' }))
+        results.push({ title: song.title, status: 'error', message: data.error ?? 'Failed' })
+        errors++
+      }
+    }
+    setBulkPublishing(false)
+    setPublishSummary({ published, errors, results })
+  }
+
   const allDisplayedSelected = displayed.length > 0 && displayed.every(s => selected.has(s.id))
 
   const statusIcon = { ok: '✓', skipped: '→', error: '✗' }
@@ -225,6 +264,43 @@ export default function SongsPage() {
             <div className="border-t border-gray-800 px-5 py-3 flex justify-end">
               <button
                 onClick={() => setImportSummary(null)}
+                className="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-500 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish summary modal */}
+      {publishSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-lg rounded-lg border border-gray-700 bg-gray-900 shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+              <h2 className="text-lg font-semibold">Publish to OnSong</h2>
+              <button onClick={() => setPublishSummary(null)} className="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div className="px-5 py-4">
+              <div className="flex gap-4 mb-4 text-sm">
+                <span className="text-emerald-400">{publishSummary.published} published</span>
+                {publishSummary.errors > 0 && <span className="text-red-400">{publishSummary.errors} failed</span>}
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-1.5">
+                {publishSummary.results.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <span className={`shrink-0 font-mono ${statusColor[r.status]}`}>{statusIcon[r.status]}</span>
+                    <div className="min-w-0">
+                      <span className="font-medium text-gray-200">{r.title}</span>
+                      {r.status !== 'ok' && <span className="ml-2 text-gray-400">{r.message}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="border-t border-gray-800 px-5 py-3 flex justify-end">
+              <button
+                onClick={() => setPublishSummary(null)}
                 className="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-500 transition-colors"
               >
                 Close
@@ -273,6 +349,13 @@ export default function SongsPage() {
         {selected.size > 0 && (
           <div className="flex items-center gap-3 mb-3 rounded border border-red-900 bg-red-950/50 px-4 py-2">
             <span className="text-sm text-gray-300">{selected.size} selected</span>
+            <button
+              onClick={bulkPublishToOnsong}
+              disabled={bulkPublishing}
+              className="rounded bg-sky-700 px-3 py-1 text-sm font-medium hover:bg-sky-600 disabled:opacity-50 transition-colors"
+            >
+              {bulkPublishing ? 'Publishing…' : '→ OnSong'}
+            </button>
             <button
               onClick={bulkDelete}
               className="rounded bg-red-600 px-3 py-1 text-sm font-medium hover:bg-red-500 transition-colors"
