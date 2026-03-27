@@ -10,6 +10,8 @@ interface EventTypeDef {
   valueOffset?: number | null
   instrumentOffset?: number | null
   hasParameter?: boolean
+  onSectionChange?: boolean
+  onSongEnd?: boolean
 }
 
 /** Create a Gear + EventTypes from a GearTemplate */
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!template) return Response.json({ error: 'Template not found' }, { status: 404 })
 
   const channel = channelOverride ?? template.midiChannel
-  const eventTypes = template.eventTypes as EventTypeDef[]
+  const eventTypes = template.eventTypes as unknown as EventTypeDef[]
 
   const gear = await prisma.gear.create({
     data: { name: template.name, midiChannel: channel, color: template.color },
