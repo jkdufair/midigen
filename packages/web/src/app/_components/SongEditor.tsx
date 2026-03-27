@@ -110,6 +110,20 @@ export default function SongEditor({ songId }: Props) {
     setForm(f => {
       const sections = [...f.sections]
       sections[i] = { ...sections[i], [key]: value }
+      // Clamp event positions when section length shrinks
+      if (key === 'length') {
+        const [newBars] = value.split('.').map(Number)
+        if (newBars > 0) {
+          sections[i] = {
+            ...sections[i],
+            events: sections[i].events.map(ev => {
+              const [bar, beat, sub] = ev.position.split('.')
+              if (Number(bar) > newBars) return { ...ev, position: `${newBars}.${beat}.${sub}` }
+              return ev
+            }),
+          }
+        }
+      }
       return { ...f, sections }
     })
   }
@@ -308,14 +322,17 @@ export default function SongEditor({ songId }: Props) {
               <div className="space-y-2 pl-2 border-l border-gray-700">
                 {(section.events ?? []).map((ev, ei) => {
                   const evType = et[ev.event]
+                  const [sectionBars] = section.length.split('.').map(Number)
+                  const [evBar] = ev.position.split('.').map(Number)
+                  const outOfBounds = evBar > sectionBars
                   return (
-                    <div key={ei} className="flex items-center gap-2">
+                    <div key={ei} className={`flex items-center gap-2${outOfBounds ? ' ring-1 ring-red-500/50 rounded px-1 -mx-1' : ''}`}>
                       {(() => {
                         const [bar = '1', beat = '1', sub = '1'] = ev.position.split('.')
                         const setPos = (b: string, bt: string, s: string) => updateEvent(si, ei, { position: `${b}.${bt}.${s}` })
                         return (
                           <div className="flex items-center gap-0.5 shrink-0">
-                            <input type="number" min={1} className="w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            <input type="number" min={1} max={sectionBars} className={`w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500${outOfBounds ? ' text-red-400' : ''}`}
                               value={bar} onChange={e => setPos(e.target.value, beat, sub)} title="Bar" />
                             <span className="text-gray-600 font-mono text-xs">.</span>
                             <input type="number" min={1} className="w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"

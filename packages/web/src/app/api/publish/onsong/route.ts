@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
     valueOffset: et.valueOffset,
     instrumentOffset: et.instrumentOffset,
     hasParameter: et.hasParameter,
+    onSectionChange: et.onSectionChange,
+    onSongEnd: et.onSongEnd,
   }))
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports

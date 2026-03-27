@@ -128,10 +128,12 @@ function generateMidi(spec, eventTypes) {
 			sectionDeltaSum += SECTION_CHANGE_OFFSET_TICKS
 		}
 
-		// Remaining events sorted by position
+		// Remaining events sorted by position (skip any beyond section boundary)
 		for (const event of (section.events ?? []).filter(e => e.position !== '1.1.1')) {
+			const eventOffsetFromSectionStart = ticksFromPosition(event.position, beatsPerMeasure)
+			if (eventOffsetFromSectionStart >= sectionTickLength) continue
+
 			if (previousEventPosition !== event.position) {
-				const eventOffsetFromSectionStart = ticksFromPosition(event.position, beatsPerMeasure)
 				nextEventDelta = eventOffsetFromSectionStart - sectionDeltaSum
 				sectionDeltaSum += nextEventDelta
 			}
