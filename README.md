@@ -59,12 +59,10 @@ DATABASE_URL="file:./dev.db"
 # OnSong Connect (required only for Publish to OnSong feature)
 ONSONG_CLIENT_UUID="<generate with: uuidgen>"
 ONSONG_API_KEY="<your OnSong Connect API key>"
-ONSONG_PORT="80"
 ```
 
-- **`ONSONG_CLIENT_UUID`** — any UUID; uniquely identifies this midigen instance to OnSong. Generate one with `uuidgen` (macOS/Linux) and keep it stable.
+- **`ONSONG_CLIENT_UUID`** — any UUID; uniquely identifies this midigen instance to OnSong (eventually will represent a single user). Generate one with `uuidgen` (macOS/Linux) and keep it stable.
 - **`ONSONG_API_KEY`** — the key from the OnSong developer program. Used to authorize your client without requiring manual approval on the iPad each time.
-- **`ONSONG_PORT`** — OnSong Connect port. Default is `80`.
 
 ### 4. Run the dev server
 
