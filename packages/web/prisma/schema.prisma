@@ -9,7 +9,7 @@ datasource db {
 
 model Gear {
   id          String      @id @default(cuid())
-  name        String
+  name        String      @unique
   midiChannel Int
   color       String?
   eventTypes  EventType[]
