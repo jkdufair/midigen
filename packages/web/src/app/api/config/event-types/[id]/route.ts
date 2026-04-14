@@ -14,7 +14,7 @@ interface Section { name: string; length: string; events?: SongEvent[] }
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
-  const { slug, label, gearId, messageType, ccNumber, ccValue, valueOffset, instrumentOffset, hasParameter, onSectionChange, onSongEnd } = body
+  const { slug, label, gearId, messageType, ccNumber, ccValue, valueOffset, instrumentOffset, hasParameter, onSectionChange, onSongEnd, isTimeSignatureCarrier } = body
 
   const data = {
     slug, label, gearId, messageType,
@@ -25,6 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     hasParameter: Boolean(hasParameter),
     onSectionChange: Boolean(onSectionChange),
     onSongEnd: Boolean(onSongEnd),
+    isTimeSignatureCarrier: Boolean(isTimeSignatureCarrier),
   }
 
   const current = await prisma.eventType.findUnique({ where: { id } })

@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     hasParameter: et.hasParameter,
     onSectionChange: et.onSectionChange,
     onSongEnd: et.onSongEnd,
+    isTimeSignatureCarrier: et.isTimeSignatureCarrier,
   }))
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports

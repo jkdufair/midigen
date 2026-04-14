@@ -28,9 +28,10 @@ model EventType {
   ccValue          Int?
   valueOffset      Int?
   instrumentOffset Int?
-  hasParameter     Boolean  @default(false)
-  onSectionChange  Boolean  @default(false)
-  onSongEnd        Boolean  @default(false)
+  hasParameter           Boolean  @default(false)
+  onSectionChange        Boolean  @default(false)
+  onSongEnd              Boolean  @default(false)
+  isTimeSignatureCarrier Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }

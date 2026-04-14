@@ -17,6 +17,7 @@ interface EventTypeItem {
   hasParameter: boolean
   onSectionChange: boolean
   onSongEnd: boolean
+  isTimeSignatureCarrier: boolean
   gear: { id: string; name: string; color: string | null }
 }
 
@@ -34,12 +35,13 @@ interface EventForm {
   hasParameter: boolean
   onSectionChange: boolean
   onSongEnd: boolean
+  isTimeSignatureCarrier: boolean
 }
 
 const EMPTY_FORM: EventForm = {
   slug: '', label: '', gearId: '', messageType: 'CC',
   ccNumber: '0', ccValue: '127', valueOffset: '0', instrumentOffset: '0', hasParameter: false,
-  onSectionChange: false, onSongEnd: false,
+  onSectionChange: false, onSongEnd: false, isTimeSignatureCarrier: false,
 }
 
 function slugify(s: string) {
@@ -75,6 +77,7 @@ export default function EventsPage() {
       hasParameter: item.hasParameter,
       onSectionChange: item.onSectionChange,
       onSongEnd: item.onSongEnd,
+      isTimeSignatureCarrier: item.isTimeSignatureCarrier,
     })
   }
 
@@ -97,6 +100,7 @@ export default function EventsPage() {
       hasParameter: form.hasParameter,
       onSectionChange: form.onSectionChange,
       onSongEnd: form.onSongEnd,
+      isTimeSignatureCarrier: form.isTimeSignatureCarrier,
     }
     const res = editing === 'new'
       ? await fetch('/api/config/event-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -212,6 +216,12 @@ export default function EventsPage() {
                 className="rounded" />
               On song end
             </label>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-300">
+              <input type="checkbox" checked={form.isTimeSignatureCarrier}
+                onChange={e => setForm(f => ({ ...f, isTimeSignatureCarrier: e.target.checked }))}
+                className="rounded" />
+              Time sig carrier
+            </label>
           </div>
         </div>
         <div className="flex gap-3">
@@ -273,6 +283,7 @@ export default function EventsPage() {
                         {item.hasParameter && <span className="text-xs text-amber-600 shrink-0">param</span>}
                         {item.onSectionChange && <span className="text-xs text-cyan-500 shrink-0">section</span>}
                         {item.onSongEnd && <span className="text-xs text-purple-400 shrink-0">end</span>}
+                        {item.isTimeSignatureCarrier && <span className="text-xs text-yellow-500 shrink-0">time-sig</span>}
                       </div>
                       <button onClick={e => { e.stopPropagation(); deleteEvent(item.id, item.slug) }} className="text-sm text-red-500 hover:text-red-400 transition-colors shrink-0 ml-4">Delete</button>
                     </div>
