@@ -122,6 +122,11 @@ function generateMidi(spec, eventTypes) {
 	const songEndEvents = eventTypes.filter(et => et.onSongEnd)
 	const timeSigCarriers = eventTypes.filter(et => et.isTimeSignatureCarrier)
 
+	// Normalize beats-per-measure to quarter-note units so tick calculations are correct
+	// for compound/odd meters (e.g. 6/8: 6*(4/8)=3, not 6).
+	// getTickDuration('1', n) treats n as quarter-note beats per measure.
+	let beatsQN = beatsPerMeasure * 4 / timeDivision
+
 	// Emit time signature CC at tick 0 (before the count-off measure)
 	let currentTimeSig = spec.timeSignature
 	if (timeSigCarriers.length > 0) {
@@ -137,7 +142,8 @@ function generateMidi(spec, eventTypes) {
 	}
 
 	// Start delta at 1 measure (count-off before the song begins)
-	let nextEventDelta = Utils.getTickDuration(['1'], beatsPerMeasure)
+	// Use string '1' (not array) so beatsQN is forwarded correctly
+	let nextEventDelta = Utils.getTickDuration('1', beatsQN)
 
 	for (const section of spec.sections) {
 		// Handle mid-song time signature change
@@ -145,6 +151,7 @@ function generateMidi(spec, eventTypes) {
 		if (sectionTimeSig !== currentTimeSig) {
 			currentTimeSig = sectionTimeSig
 			;[beatsPerMeasure, timeDivision] = currentTimeSig.split('/').map(x => parseInt(x))
+			beatsQN = beatsPerMeasure * 4 / timeDivision
 			track.setTimeSignature(beatsPerMeasure, timeDivision)
 			if (timeSigCarriers.length > 0) {
 				const ccValue = getTimeSignatureCCValue(currentTimeSig)
@@ -162,7 +169,7 @@ function generateMidi(spec, eventTypes) {
 			}
 		}
 
-		const sectionTickLength = ticksFromLength(section.length, beatsPerMeasure)
+		const sectionTickLength = ticksFromLength(section.length, beatsQN)
 		let sectionDeltaSum = 0
 		let previousEventPosition = ''
 
@@ -185,7 +192,7 @@ function generateMidi(spec, eventTypes) {
 
 		// Remaining events sorted by position (skip any beyond section boundary)
 		for (const event of (section.events ?? []).filter(e => e.position !== '1.1.1')) {
-			const eventOffsetFromSectionStart = ticksFromPosition(event.position, beatsPerMeasure)
+			const eventOffsetFromSectionStart = ticksFromPosition(event.position, beatsQN)
 			if (eventOffsetFromSectionStart >= sectionTickLength) continue
 
 			if (previousEventPosition !== event.position) {
