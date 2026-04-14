@@ -12,9 +12,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const body = await req.json()
   const { title, tempo, timeSignature, sections, notes } = body
+  const normalizedNotes = (typeof notes === 'string' && notes.trim() !== '' && notes.trim() !== '<p></p>')
+    ? notes
+    : null
   const song = await prisma.song.update({
     where: { id },
-    data: { title, tempo: Number(tempo), timeSignature, sections, notes: notes ?? null },
+    data: { title, tempo: Number(tempo), timeSignature, sections, notes: normalizedNotes },
   })
   return Response.json(song)
 }
