@@ -113,7 +113,16 @@ export default function EventsPage() {
 
   const grouped = gear.map(g => ({
     gear: g,
-    items: events.filter(e => e.gear.id === g.id && (!filterGear || g.id === filterGear)),
+    items: events
+      .filter(e => e.gear.id === g.id && (!filterGear || g.id === filterGear))
+      .sort((a, b) => {
+        // PC sorts after CC by number; use ccNumber for CC types, instrumentOffset for PC
+        const aNum = a.messageType === 'PC' ? (a.instrumentOffset ?? 0) + 1000 : (a.ccNumber ?? 0)
+        const bNum = b.messageType === 'PC' ? (b.instrumentOffset ?? 0) + 1000 : (b.ccNumber ?? 0)
+        if (aNum !== bNum) return aNum - bNum
+        // Then by ccValue descending (127 before 0)
+        return (b.ccValue ?? 0) - (a.ccValue ?? 0)
+      }),
   })).filter(g => g.items.length > 0 || !filterGear)
 
   function renderEditForm() {
