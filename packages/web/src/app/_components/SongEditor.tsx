@@ -12,6 +12,7 @@ interface SongEvent {
 interface Section {
   name: string
   length: string
+  timeSignature?: string
   events: SongEvent[]
 }
 
@@ -314,6 +315,23 @@ export default function SongEditor({ songId }: Props) {
                       </div>
                     </>)
                   })()}
+                </div>
+                <div className="flex flex-col items-center">
+                  <input
+                    className="w-14 rounded bg-gray-800 px-1.5 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={section.timeSignature ?? ''}
+                    onChange={e => {
+                      const val = e.target.value
+                      setForm(f => {
+                        const sections = [...f.sections]
+                        const { timeSignature: _, ...rest } = sections[si]
+                        sections[si] = val ? { ...rest, timeSignature: val } : rest as Section
+                        return { ...f, sections }
+                      })
+                    }}
+                    placeholder={form.timeSignature}
+                  />
+                  <span className="text-[10px] text-gray-500">time sig</span>
                 </div>
                 <button onClick={() => removeSection(si)} className="text-red-500 hover:text-red-400 text-sm">✕</button>
               </div>

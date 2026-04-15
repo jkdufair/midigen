@@ -14,6 +14,8 @@ export interface EventTypeConfig {
   onSectionChange?: boolean
   /** Fire this event automatically at the end of the song */
   onSongEnd?: boolean
+  /** Derive CC value from the current time signature via the built-in lookup table */
+  isTimeSignatureCarrier?: boolean
 }
 
 export interface GearLibraryEventType {
@@ -27,6 +29,7 @@ export interface GearLibraryEventType {
   hasParameter: boolean
   onSectionChange?: boolean
   onSongEnd?: boolean
+  isTimeSignatureCarrier?: boolean
 }
 
 export interface GearLibraryEntry {
@@ -46,6 +49,7 @@ export interface SongEvent {
 export interface Section {
   name: string
   length: string
+  timeSignature?: string
   events?: SongEvent[]
 }
 
