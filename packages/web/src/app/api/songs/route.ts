@@ -1,10 +1,19 @@
 import { prisma } from '@/lib/db'
 import { NextRequest } from 'next/server'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const withNotes = req.nextUrl.searchParams.get('withNotes') === '1'
   const songs = await prisma.song.findMany({
-    select: { id: true, title: true, tempo: true, timeSignature: true, createdAt: true, updatedAt: true },
-    orderBy: { updatedAt: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      tempo: true,
+      timeSignature: true,
+      createdAt: true,
+      updatedAt: true,
+      ...(withNotes ? { notes: true } : {}),
+    },
+    orderBy: { title: 'asc' },
   })
   return Response.json(songs)
 }

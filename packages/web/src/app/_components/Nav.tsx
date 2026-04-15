@@ -7,6 +7,7 @@ const links = [
   { href: '/', label: 'Songs', match: (p: string) => p === '/' || p.startsWith('/songs') },
   { href: '/config/gear', label: 'Gear', match: (p: string) => p.startsWith('/config/gear') },
   { href: '/config/events', label: 'Events', match: (p: string) => p.startsWith('/config/events') },
+  { href: '/todos', label: 'Todos', match: (p: string) => p.startsWith('/todos') },
 ]
 
 export default function Nav() {
