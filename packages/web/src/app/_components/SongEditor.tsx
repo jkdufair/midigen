@@ -36,8 +36,25 @@ interface SongForm {
   title: string
   tempo: string
   timeSignature: string
+  /** Semitone offsets from standard tuning; index 0 = string 6 (low E), index 5 = string 1 (high E) */
+  tuning: number[]
   sections: Section[]
   notes: string
+}
+
+// Variax tuning helpers
+const NOTE_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+const STANDARD_STRING_MIDI = [40, 45, 50, 55, 59, 64]
+const STRING_LABELS = ['Low E', 'A', 'D', 'G', 'B', 'High E']
+
+function getTuningOptions(stringIdx: number) {
+  return Array.from({ length: 25 }, (_, i) => {
+    const offset = 12 - i
+    const midi = STANDARD_STRING_MIDI[stringIdx] + offset
+    const noteName = NOTE_NAMES[((midi % 12) + 12) % 12]
+    const sign = offset > 0 ? '+' : ''
+    return { value: offset, label: `${noteName} (${sign}${offset})` }
+  })
 }
 
 interface EventTypeSummary {
@@ -56,6 +73,7 @@ const DEFAULT_SONG: SongForm = {
   title: '',
   tempo: '120',
   timeSignature: '4/4',
+  tuning: [0, 0, 0, 0, 0, 0],
   sections: [],
   notes: '',
 }
@@ -132,6 +150,7 @@ export default function SongEditor({ songId }: Props) {
           title: song.title,
           tempo: String(song.tempo),
           timeSignature: song.timeSignature,
+          tuning: Array.isArray(song.tuning) ? song.tuning : [0, 0, 0, 0, 0, 0],
           sections: (song.sections ?? []).map((s: Section) => ({ ...s, events: s.events ?? [] })),
           notes: song.notes ?? '',
         })
@@ -143,6 +162,7 @@ export default function SongEditor({ songId }: Props) {
     title: form.title,
     tempo: Number(form.tempo),
     timeSignature: form.timeSignature,
+    tuning: form.tuning,
     sections: form.sections,
     notes: form.notes,
   }), [form])
@@ -159,6 +179,7 @@ export default function SongEditor({ songId }: Props) {
         title: parsed.title ?? '',
         tempo: String(parsed.tempo ?? 120),
         timeSignature: parsed.timeSignature ?? '4/4',
+        tuning: Array.isArray(parsed.tuning) ? parsed.tuning : [0, 0, 0, 0, 0, 0],
         sections: parsed.sections ?? [],
         notes: f.notes,
       }))
@@ -340,6 +361,29 @@ export default function SongEditor({ songId }: Props) {
               onChange={e => setForm(f => ({ ...f, timeSignature: e.target.value }))}
               placeholder="4/4"
             />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Tuning (Variax)</label>
+          <div className="grid grid-cols-6 gap-2">
+            {STRING_LABELS.map((label, idx) => (
+              <div key={idx}>
+                <div className="text-[10px] text-gray-500 text-center mb-0.5">{label}</div>
+                <select
+                  className="w-full rounded bg-gray-800 px-1 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={form.tuning[idx] ?? 0}
+                  onChange={e => {
+                    const newTuning = [...form.tuning]
+                    newTuning[idx] = Number(e.target.value)
+                    setForm(f => ({ ...f, tuning: newTuning }))
+                  }}
+                >
+                  {getTuningOptions(idx).map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
           </div>
         </div>
       </div>

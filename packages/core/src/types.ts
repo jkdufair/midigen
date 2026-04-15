@@ -57,5 +57,7 @@ export interface SongSpec {
   title: string
   tempo: number
   timeSignature: string
+  /** Semitone offsets from standard tuning, index 0 = string 6 (low E), index 5 = string 1 (high E) */
+  tuning?: number[]
   sections: Section[]
 }

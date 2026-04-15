@@ -29,12 +29,12 @@ export async function DELETE(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { title, tempo, timeSignature, sections, notes } = body
+  const { title, tempo, timeSignature, tuning, sections, notes } = body
   if (!title || !tempo || !timeSignature || !sections) {
     return Response.json({ error: 'title, tempo, timeSignature, and sections required' }, { status: 400 })
   }
   const song = await prisma.song.create({
-    data: { title, tempo: Number(tempo), timeSignature, sections, notes: notes ?? null },
+    data: { title, tempo: Number(tempo), timeSignature, tuning: tuning ?? null, sections, notes: notes ?? null },
   })
   return Response.json(song, { status: 201 })
 }
