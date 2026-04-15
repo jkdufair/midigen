@@ -11,10 +11,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
-  const { title, tempo, timeSignature, sections } = body
+  const { title, tempo, timeSignature, sections, notes } = body
   const song = await prisma.song.update({
     where: { id },
-    data: { title, tempo: Number(tempo), timeSignature, sections },
+    data: { title, tempo: Number(tempo), timeSignature, sections, notes: notes ?? null },
   })
   return Response.json(song)
 }

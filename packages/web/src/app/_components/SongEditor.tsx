@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import RichTextEditor from './RichTextEditor'
 
 interface SongEvent {
   position: string
@@ -21,6 +22,7 @@ interface SongForm {
   tempo: string
   timeSignature: string
   sections: Section[]
+  notes: string
 }
 
 interface EventTypeSummary {
@@ -40,6 +42,7 @@ const DEFAULT_SONG: SongForm = {
   tempo: '120',
   timeSignature: '4/4',
   sections: [],
+  notes: '',
 }
 
 export default function SongEditor({ songId }: Props) {
@@ -66,6 +69,7 @@ export default function SongEditor({ songId }: Props) {
           tempo: String(song.tempo),
           timeSignature: song.timeSignature,
           sections: (song.sections ?? []).map((s: Section) => ({ ...s, events: s.events ?? [] })),
+          notes: song.notes ?? '',
         })
       })
     }
@@ -76,6 +80,7 @@ export default function SongEditor({ songId }: Props) {
     tempo: Number(form.tempo),
     timeSignature: form.timeSignature,
     sections: form.sections,
+    notes: form.notes,
   }), [form])
 
   useEffect(() => {
@@ -86,12 +91,13 @@ export default function SongEditor({ songId }: Props) {
   function applyJsonText() {
     try {
       const parsed = JSON.parse(jsonText)
-      setForm({
+      setForm(f => ({
         title: parsed.title ?? '',
         tempo: String(parsed.tempo ?? 120),
         timeSignature: parsed.timeSignature ?? '4/4',
         sections: parsed.sections ?? [],
-      })
+        notes: f.notes,
+      }))
       setJsonError('')
       setJsonView(false)
     } catch {
@@ -402,6 +408,15 @@ export default function SongEditor({ songId }: Props) {
           </button>
         </div>
       )}
+
+      {/* TODO / Notes */}
+      <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">TODO / Notes</h2>
+        <RichTextEditor
+          value={form.notes}
+          onChange={html => setForm(f => ({ ...f, notes: html }))}
+        />
+      </div>
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-3 pt-2">
