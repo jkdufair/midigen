@@ -1,0 +1,12 @@
+{
+  "name": "@midigen/cli",
+  "version": "0.0.1",
+  "description": "Generate MIDI files for live performance",
+  "main": "src/main.js",
+  "bin": {
+    "midigen": "src/main.js"
+  },
+  "dependencies": {
+    "@midigen/core": "*"
+  }
+}

@@ -1,0 +1,57 @@
+export type MessageType = 'CC' | 'CC_PARAM_VALUE' | 'PC'
+
+export interface EventTypeConfig {
+  slug: string
+  label: string
+  midiChannel: number
+  messageType: MessageType
+  ccNumber?: number | null
+  ccValue?: number | null
+  valueOffset?: number | null
+  instrumentOffset?: number | null
+  hasParameter: boolean
+  /** Fire this event automatically at each section boundary */
+  onSectionChange?: boolean
+  /** Fire this event automatically at the end of the song */
+  onSongEnd?: boolean
+}
+
+export interface GearLibraryEventType {
+  slug: string
+  label: string
+  messageType: MessageType
+  ccNumber?: number | null
+  ccValue?: number | null
+  valueOffset?: number | null
+  instrumentOffset?: number | null
+  hasParameter: boolean
+  onSectionChange?: boolean
+  onSongEnd?: boolean
+}
+
+export interface GearLibraryEntry {
+  key: string
+  name: string
+  midiChannel: number
+  color: string
+  eventTypes: GearLibraryEventType[]
+}
+
+export interface SongEvent {
+  position: string
+  event: string
+  parameter?: number
+}
+
+export interface Section {
+  name: string
+  length: string
+  events?: SongEvent[]
+}
+
+export interface SongSpec {
+  title: string
+  tempo: number
+  timeSignature: string
+  sections: Section[]
+}

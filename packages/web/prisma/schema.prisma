@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Gear {
+  id          String      @id @default(cuid())
+  name        String
+  midiChannel Int
+  color       String?
+  eventTypes  EventType[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model EventType {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  label            String
+  gearId           String
+  gear             Gear     @relation(fields: [gearId], references: [id], onDelete: Cascade)
+  messageType      String
+  ccNumber         Int?
+  ccValue          Int?
+  valueOffset      Int?
+  instrumentOffset Int?
+  hasParameter     Boolean  @default(false)
+  onSectionChange  Boolean  @default(false)
+  onSongEnd        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model GearTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  midiChannel Int
+  color       String?
+  eventTypes  Json     // Array of { slug, label, messageType, ccNumber?, ccValue?, valueOffset?, instrumentOffset?, hasParameter }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Song {
+  id            String   @id @default(cuid())
+  title         String
+  tempo         Int
+  timeSignature String
+  sections      Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

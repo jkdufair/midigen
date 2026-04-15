@@ -1,0 +1,9 @@
+{
+  "name": "@midigen/core",
+  "version": "0.0.1",
+  "main": "src/index.js",
+  "types": "src/types.ts",
+  "dependencies": {
+    "midi-writer-js": "^2.1.4"
+  }
+}
