@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
       title: song.title,
       tempo: song.tempo,
       timeSignature: song.timeSignature,
+      tuning: Array.isArray(song.tuning) ? (song.tuning as number[]) : undefined,
       sections: song.sections as unknown as SongSpec['sections'],
     }
   } else {

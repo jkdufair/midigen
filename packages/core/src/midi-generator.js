@@ -11,6 +11,13 @@ const { ControllerChangeEvent, ProgramChangeEvent, Track, Utils, Writer } = midi
 // Section-change events fire slightly after any 1.1.1 events
 const SECTION_CHANGE_OFFSET_TICKS = 16
 
+// Variax tuning: convert a semitone offset (-12 to +12) to a MIDI CC value (0-127).
+// 0 semitones (standard tuning) maps to ~64 (midpoint of the range).
+function semitoneOffsetToCCValue(offset) {
+	const clamped = Math.max(-12, Math.min(12, offset))
+	return Math.round((clamped + 12) * 127 / 24)
+}
+
 // Loopy Pro CC lookup table: time signature numerator → CC value
 // CC value is the midpoint of each range in the user's Loopy Pro binding
 const TIME_SIG_CC_VALUES = {
@@ -135,6 +142,18 @@ function generateMidi(spec, eventTypes) {
 			}))
 		}
 	}
+
+	// Emit Variax tuning CCs at tick 0 (Helix, channel 2, CC 111-116)
+	// tuning[0] = string 6 (low E → CC 116), tuning[5] = string 1 (high E → CC 111)
+	const tuning = Array.isArray(spec.tuning) ? spec.tuning : [0, 0, 0, 0, 0, 0]
+	tuning.forEach((offset, idx) => {
+			track.addEvent(new ControllerChangeEvent({
+				controllerNumber: 116 - idx,
+				controllerValue: semitoneOffsetToCCValue(offset),
+				channel: 2,
+				delta: 0,
+			}))
+		})
 
 	// Start delta at 1 measure (count-off before the song begins).
 	// Use string '1' (not array ['1']) so beatsPerMeasure is forwarded — the array

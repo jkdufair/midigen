@@ -51,6 +51,7 @@ model Song {
   title         String
   tempo         Int
   timeSignature String
+  tuning        Json?
   sections      Json
   notes         String?
   createdAt     DateTime @default(now())
