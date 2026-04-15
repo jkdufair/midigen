@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   DndContext,
@@ -62,7 +62,8 @@ interface EventTypeSummary {
   slug: string
   label: string
   hasParameter: boolean
-  gear: { name: string; color: string | null }
+  gearId: string
+  gear: { id: string; name: string; color: string | null }
 }
 
 interface Props {
@@ -131,6 +132,7 @@ export default function SongEditor({ songId }: Props) {
   const [jsonView, setJsonView] = useState(false)
   const [jsonError, setJsonError] = useState('')
   const [eventTypes, setEventTypes] = useState<EventTypeSummary[]>([])
+  const [gearByRow, setGearByRow] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -232,6 +234,9 @@ export default function SongEditor({ songId }: Props) {
       if (oldIndex === -1 || newIndex === -1) return f
       return { ...f, sections: arrayMove(f.sections, oldIndex, newIndex) }
     })
+    // Row keys are section-index based; reorder invalidates them. Drop transient
+    // gear picks — they re-derive from each event's slug on next render.
+    setGearByRow({})
   }
 
   function addEvent(sectionIdx: number) {
@@ -239,7 +244,7 @@ export default function SongEditor({ songId }: Props) {
       const sections = [...f.sections]
       sections[sectionIdx] = {
         ...sections[sectionIdx],
-        events: [...sections[sectionIdx].events, { position: '1.1.1', event: eventTypes[0]?.slug ?? '' }],
+        events: [...sections[sectionIdx].events, { position: '1.1.1', event: '' }],
       }
       return { ...f, sections }
     })
@@ -324,6 +329,25 @@ export default function SongEditor({ songId }: Props) {
   }
 
   const et = eventTypes.reduce<Record<string, EventTypeSummary>>((acc, e) => { acc[e.slug] = e; return acc }, {})
+
+  const gearOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>()
+    for (const t of eventTypes) map.set(t.gearId, { id: t.gearId, name: t.gear.name })
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [eventTypes])
+
+  function rowKey(si: number, ei: number) { return `${si}-${ei}` }
+  function getRowGear(si: number, ei: number, ev: SongEvent): string {
+    const key = rowKey(si, ei)
+    if (key in gearByRow) return gearByRow[key]
+    return et[ev.event]?.gearId ?? ''
+  }
+  function onGearChange(si: number, ei: number, ev: SongEvent, newGearId: string) {
+    setGearByRow(g => ({ ...g, [rowKey(si, ei)]: newGearId }))
+    if (ev.event && et[ev.event]?.gearId !== newGearId) {
+      updateEvent(si, ei, { event: '', parameter: undefined })
+    }
+  }
 
   // Stable IDs for DnD — we use index as string since sections have no db id in state.
   // arrayMove keeps ordering correct; IDs are re-derived after each render.
@@ -509,16 +533,35 @@ export default function SongEditor({ songId }: Props) {
                                     </div>
                                   )
                                 })()}
-                                <select
-                                  className="flex-1 rounded bg-gray-800 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                  value={ev.event}
-                                  onChange={e => updateEvent(si, ei, { event: e.target.value, parameter: undefined })}
-                                >
-                                  {eventTypes.length === 0 && <option value="">No event types configured</option>}
-                                  {eventTypes.map(et => (
-                                    <option key={et.id} value={et.slug}>{et.gear.name} — {et.label}</option>
-                                  ))}
-                                </select>
+                                {(() => {
+                                  const rowGearId = getRowGear(si, ei, ev)
+                                  const filteredEvents = eventTypes.filter(t => t.gearId === rowGearId)
+                                  return (
+                                    <div className="flex flex-1 gap-2 min-w-0">
+                                      <select
+                                        className="flex-1 min-w-0 rounded bg-gray-800 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        value={rowGearId}
+                                        onChange={e => onGearChange(si, ei, ev, e.target.value)}
+                                      >
+                                        <option value="">{gearOptions.length === 0 ? 'No gear configured' : 'Gear…'}</option>
+                                        {gearOptions.map(g => (
+                                          <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                      </select>
+                                      <select
+                                        className="flex-1 min-w-0 rounded bg-gray-800 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                                        value={ev.event}
+                                        disabled={!rowGearId}
+                                        onChange={e => updateEvent(si, ei, { event: e.target.value, parameter: undefined })}
+                                      >
+                                        <option value="">{rowGearId && filteredEvents.length === 0 ? 'No events for this gear' : 'Event…'}</option>
+                                        {filteredEvents.map(t => (
+                                          <option key={t.id} value={t.slug}>{t.label}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )
+                                })()}
                                 {evType?.hasParameter && (
                                   <input
                                     type="number"
