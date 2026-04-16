@@ -17,12 +17,20 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { AnimatePresence, motion } from 'framer-motion'
 import RichTextEditor from './RichTextEditor'
 
 interface SongEvent {
   position: string
   event: string
   parameter?: number
+  _key?: string
+}
+
+let _nextKey = 0
+function assignKey(ev: SongEvent): SongEvent {
+  if (ev._key) return ev
+  return { ...ev, _key: `ev-${++_nextKey}` }
 }
 
 interface Section {
@@ -153,7 +161,7 @@ export default function SongEditor({ songId }: Props) {
           tempo: String(song.tempo),
           timeSignature: song.timeSignature,
           tuning: Array.isArray(song.tuning) ? song.tuning : [0, 0, 0, 0, 0, 0],
-          sections: (song.sections ?? []).map((s: Section) => ({ ...s, events: s.events ?? [] })),
+          sections: (song.sections ?? []).map((s: Section) => ({ ...s, events: (s.events ?? []).map(assignKey) })),
           notes: song.notes ?? '',
         })
       })
@@ -165,7 +173,10 @@ export default function SongEditor({ songId }: Props) {
     tempo: Number(form.tempo),
     timeSignature: form.timeSignature,
     tuning: form.tuning,
-    sections: form.sections,
+    sections: form.sections.map(s => ({
+      ...s,
+      events: s.events.map(({ _key, ...rest }) => rest),
+    })),
     notes: form.notes,
   }), [form])
 
@@ -244,7 +255,7 @@ export default function SongEditor({ songId }: Props) {
       const sections = [...f.sections]
       sections[sectionIdx] = {
         ...sections[sectionIdx],
-        events: [...sections[sectionIdx].events, { position: '1.1.1', event: '' }],
+        events: [...sections[sectionIdx].events, assignKey({ position: '1.1.1', event: '' })],
       }
       return { ...f, sections }
     })
@@ -269,6 +280,20 @@ export default function SongEditor({ songId }: Props) {
       sections[sectionIdx] = { ...sections[sectionIdx], events }
       return { ...f, sections }
     })
+  }
+
+  function sortSectionEvents(sectionIdx: number) {
+    setForm(f => {
+      const sections = [...f.sections]
+      const sorted = [...sections[sectionIdx].events].sort((a, b) => {
+        const [aBar, aBeat, aSub] = a.position.split('.').map(Number)
+        const [bBar, bBeat, bSub] = b.position.split('.').map(Number)
+        return (aBar - bBar) || (aBeat - bBeat) || (aSub - bSub)
+      })
+      sections[sectionIdx] = { ...sections[sectionIdx], events: sorted }
+      return { ...f, sections }
+    })
+    setGearByRow({})
   }
 
   async function save() {
@@ -510,26 +535,27 @@ export default function SongEditor({ songId }: Props) {
 
                         {/* Events */}
                         <div className="space-y-2 pl-2 border-l border-gray-700">
+                          <AnimatePresence>
                           {(section.events ?? []).map((ev, ei) => {
                             const evType = et[ev.event]
                             const [sectionBars] = section.length.split('.').map(Number)
                             const [evBar] = ev.position.split('.').map(Number)
                             const outOfBounds = evBar > sectionBars
                             return (
-                              <div key={ei} className={`flex items-center gap-2${outOfBounds ? ' ring-1 ring-red-500/50 rounded px-1 -mx-1' : ''}`}>
+                              <motion.div layout transition={{ duration: 0.2 }} exit={{ opacity: 0 }} key={ev._key ?? ei} className={`flex items-center gap-2${outOfBounds ? ' ring-1 ring-red-500/50 rounded px-1 -mx-1' : ''}`}>
                                 {(() => {
                                   const [bar = '1', beat = '1', sub = '1'] = ev.position.split('.')
                                   const setPos = (b: string, bt: string, s: string) => updateEvent(si, ei, { position: `${b}.${bt}.${s}` })
                                   return (
                                     <div className="flex items-center gap-0.5 shrink-0">
                                       <input type="number" min={1} max={sectionBars} className={`w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500${outOfBounds ? ' text-red-400' : ''}`}
-                                        value={bar} onChange={e => setPos(e.target.value, beat, sub)} title="Bar" />
+                                        value={bar} onChange={e => setPos(e.target.value, beat, sub)} onBlur={() => sortSectionEvents(si)} title="Bar" />
                                       <span className="text-gray-600 font-mono text-xs">.</span>
                                       <input type="number" min={1} className="w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                        value={beat} onChange={e => setPos(bar, e.target.value, sub)} title="Beat" />
+                                        value={beat} onChange={e => setPos(bar, e.target.value, sub)} onBlur={() => sortSectionEvents(si)} title="Beat" />
                                       <span className="text-gray-600 font-mono text-xs">.</span>
                                       <input type="number" min={1} className="w-10 rounded bg-gray-800 px-1 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                        value={sub} onChange={e => setPos(bar, beat, e.target.value)} title="Sub" />
+                                        value={sub} onChange={e => setPos(bar, beat, e.target.value)} onBlur={() => sortSectionEvents(si)} title="Sub" />
                                     </div>
                                   )
                                 })()}
@@ -572,9 +598,10 @@ export default function SongEditor({ songId }: Props) {
                                   />
                                 )}
                                 <button onClick={() => removeEvent(si, ei)} className="text-gray-500 hover:text-red-400 text-sm">✕</button>
-                              </div>
+                              </motion.div>
                             )
                           })}
+                          </AnimatePresence>
                           <button
                             onClick={() => addEvent(si)}
                             className="text-xs text-gray-500 hover:text-indigo-400 transition-colors"
