@@ -464,6 +464,14 @@ export default function SongEditor({ songId }: Props) {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={sectionIds} strategy={verticalListSortingStrategy}>
             <div className="space-y-1">
+              {form.sections.length === 0 && (
+                <button
+                  onClick={() => insertSectionAt(0)}
+                  className="w-full rounded-lg border border-dashed border-gray-700 py-6 text-sm text-gray-500 hover:border-indigo-600 hover:text-indigo-400 transition-colors"
+                >
+                  + Add section
+                </button>
+              )}
               {form.sections.map((section, si) => (
                 <div key={si}>
                   {si === 0 && (
