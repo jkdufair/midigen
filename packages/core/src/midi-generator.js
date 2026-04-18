@@ -15,7 +15,7 @@ const SECTION_CHANGE_OFFSET_TICKS = 16
 // 0 semitones (standard tuning) maps to ~64 (midpoint of the range).
 function semitoneOffsetToCCValue(offset) {
 	const clamped = Math.max(-12, Math.min(12, offset))
-	return Math.round((clamped + 12) * 127 / 24)
+	return Math.ceil((clamped + 12) * 127 / 24)
 }
 
 // Loopy Pro CC lookup table: time signature numerator → CC value
@@ -105,8 +105,22 @@ function buildMidiEvent(eventType, delta, parameter) {
  */
 function writeSpecEvent(eventSlug, parameter, delta, track, eventTypes) {
 	const eventType = eventTypes.find(et => et.slug === eventSlug)
-	if (!eventType) return // silently skip — validation happens at import time
+	if (!eventType) return false // silently skip — validation happens at import time
 	track.addEvent(buildMidiEvent(eventType, delta, parameter))
+	return eventSlug === 'helix-snapshot' || eventSlug === 'helix-patch-change'
+}
+
+const TUNING_REINFORCE_OFFSET_TICKS = 8
+
+function emitTuningCCs(track, tuning, delta) {
+	tuning.forEach((offset, idx) => {
+		track.addEvent(new ControllerChangeEvent({
+			controllerNumber: 116 - idx,
+			controllerValue: semitoneOffsetToCCValue(offset),
+			channel: 2,
+			delta: idx === 0 ? delta : 0,
+		}))
+	})
 }
 
 /**
@@ -146,14 +160,7 @@ function generateMidi(spec, eventTypes) {
 	// Emit Variax tuning CCs at tick 0 (Helix, channel 2, CC 111-116)
 	// tuning[0] = string 6 (low E → CC 116), tuning[5] = string 1 (high E → CC 111)
 	const tuning = Array.isArray(spec.tuning) ? spec.tuning : [0, 0, 0, 0, 0, 0]
-	tuning.forEach((offset, idx) => {
-			track.addEvent(new ControllerChangeEvent({
-				controllerNumber: 116 - idx,
-				controllerValue: semitoneOffsetToCCValue(offset),
-				channel: 2,
-				delta: 0,
-			}))
-		})
+	emitTuningCCs(track, tuning, 0)
 
 	// Start delta at 1 measure (count-off before the song begins).
 	// Use string '1' (not array ['1']) so beatsPerMeasure is forwarded — the array
@@ -188,9 +195,15 @@ function generateMidi(spec, eventTypes) {
 		let previousEventPosition = ''
 
 		// Events at 1.1.1 fire at the section boundary
+		let needsTuningReinforce = false
 		for (const event of (section.events ?? []).filter(e => e.position === '1.1.1')) {
-			writeSpecEvent(event.event, event.parameter, nextEventDelta, track, eventTypes)
+			if (writeSpecEvent(event.event, event.parameter, nextEventDelta, track, eventTypes))
+				needsTuningReinforce = true
 			nextEventDelta = 0
+		}
+		if (needsTuningReinforce) {
+			emitTuningCCs(track, tuning, TUNING_REINFORCE_OFFSET_TICKS)
+			sectionDeltaSum += TUNING_REINFORCE_OFFSET_TICKS
 		}
 
 		// Section-change events fire slightly after 1.1.1 events
@@ -213,9 +226,13 @@ function generateMidi(spec, eventTypes) {
 				nextEventDelta = eventOffsetFromSectionStart - sectionDeltaSum
 				sectionDeltaSum += nextEventDelta
 			}
-			writeSpecEvent(event.event, event.parameter, nextEventDelta, track, eventTypes)
+			const reinforce = writeSpecEvent(event.event, event.parameter, nextEventDelta, track, eventTypes)
 			previousEventPosition = event.position
 			nextEventDelta = 0
+			if (reinforce) {
+				emitTuningCCs(track, tuning, TUNING_REINFORCE_OFFSET_TICKS)
+				sectionDeltaSum += TUNING_REINFORCE_OFFSET_TICKS
+			}
 		}
 
 		nextEventDelta += sectionTickLength - sectionDeltaSum
