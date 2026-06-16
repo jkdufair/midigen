@@ -78,7 +78,7 @@ async function getToken(host: string, port: number, uuid: string, apiKey: string
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: apiKey, name: 'midigen' }),
+    body: JSON.stringify({ api_key: apiKey, name: 'midigen' }),
     signal: AbortSignal.timeout(5000),
   })
 
@@ -94,7 +94,7 @@ async function getToken(host: string, port: number, uuid: string, apiKey: string
         const retry = await fetch(url, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: apiKey, name: 'midigen' }),
+          body: JSON.stringify({ api_key: apiKey, name: 'midigen' }),
           signal: AbortSignal.timeout(5000),
         })
         if (retry.ok) {
@@ -126,13 +126,35 @@ export function clearOnSongCache() {
   cachedToken = null
 }
 
-export async function publishMidi(title: string, midiBuffer: Buffer, tempo?: number): Promise<void> {
+async function getBaseUrl(): Promise<string> {
   const { uuid, apiKey } = getConfig()
+  const { host, port } = await discoverDevice()
+  const token = await getToken(host, port, uuid, apiKey)
+  return `http://${host}:${port}/api/${token}`
+}
 
-  async function tryUpload(): Promise<{ baseUrl: string }> {
-    const { host, port } = await discoverDevice()
-    const token = await getToken(host, port, uuid, apiKey)
-    const baseUrl = `http://${host}:${port}/api/${token}`
+async function deleteExistingMedia(baseUrl: string, title: string): Promise<void> {
+  const mediaRes = await fetch(`${baseUrl}/media`, { signal: AbortSignal.timeout(5000) })
+  if (!mediaRes.ok) return
+  const data = await mediaRes.json() as { results?: { ID: string; title: string }[] }
+  const existing = data.results?.find(m => m.title === title)
+  if (!existing) return
+
+  const delRes = await fetch(`${baseUrl}/media/${existing.ID}`, {
+    method: 'DELETE',
+    signal: AbortSignal.timeout(5000),
+  })
+  if (!delRes.ok) {
+    const text = await delRes.text()
+    throw new Error(`OnSong media delete failed: ${delRes.status} ${text}`)
+  }
+}
+
+export async function publishMidi(title: string, midiBuffer: Buffer, tempo?: number): Promise<void> {
+  async function tryPublish(): Promise<{ baseUrl: string }> {
+    const baseUrl = await getBaseUrl()
+
+    await deleteExistingMedia(baseUrl, title)
 
     const filename = `${title}.mid`
     const form = new FormData()
@@ -150,13 +172,12 @@ export async function publishMidi(title: string, midiBuffer: Buffer, tempo?: num
     return { baseUrl }
   }
 
-  // Try once; on failure, clear cache (device may have changed IP) and retry
   let baseUrl: string
   try {
-    ({ baseUrl } = await tryUpload())
+    ({ baseUrl } = await tryPublish())
   } catch {
     clearOnSongCache();
-    ({ baseUrl } = await tryUpload())
+    ({ baseUrl } = await tryPublish())
   }
 
   // Set tempo on the song if provided

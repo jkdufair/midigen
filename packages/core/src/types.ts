@@ -44,12 +44,23 @@ export interface SongEvent {
   position: string
   event: string
   parameter?: number
+  /** Only set when `event === 'variax-tuning'`. Six semitone offsets, index 0 = low E, index 5 = high E. */
+  tuning?: number[]
+}
+
+export interface TimeSigChange {
+  /** 1-based measure within the section where the new meter begins */
+  measure: number
+  /** e.g. "2/4"; persists until the next change or the next section's override */
+  timeSignature: string
 }
 
 export interface Section {
   name: string
   length: string
   timeSignature?: string
+  /** Mid-section meter changes at barlines; each persists until the next change */
+  timeSigChanges?: TimeSigChange[]
   events?: SongEvent[]
 }
 

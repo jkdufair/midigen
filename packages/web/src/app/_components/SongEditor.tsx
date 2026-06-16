@@ -24,6 +24,7 @@ interface SongEvent {
   position: string
   event: string
   parameter?: number
+  tuning?: number[]
   _key?: string
 }
 
@@ -33,10 +34,16 @@ function assignKey(ev: SongEvent): SongEvent {
   return { ...ev, _key: `ev-${++_nextKey}` }
 }
 
+interface TimeSigChange {
+  measure: number
+  timeSignature: string
+}
+
 interface Section {
   name: string
   length: string
   timeSignature?: string
+  timeSigChanges?: TimeSigChange[]
   events: SongEvent[]
 }
 
@@ -64,6 +71,18 @@ function getTuningOptions(stringIdx: number) {
     return { value: offset, label: `${noteName} (${sign}${offset})` }
   })
 }
+
+const VARIAX_GEAR_ID = '__variax__'
+const VARIAX_TUNING_SLUG = 'variax-tuning'
+const VARIAX_TUNING_EVENT_TYPE = {
+  id: '__variax-tuning__',
+  slug: VARIAX_TUNING_SLUG,
+  label: 'Tuning change',
+  hasParameter: false,
+  gearId: VARIAX_GEAR_ID,
+  gear: { id: VARIAX_GEAR_ID, name: 'Variax', color: null },
+}
+const VARIAX_GEAR_OPTION = { id: VARIAX_GEAR_ID, name: 'Variax' }
 
 interface EventTypeSummary {
   id: string
@@ -296,6 +315,43 @@ export default function SongEditor({ songId }: Props) {
     setGearByRow({})
   }
 
+  function addTimeSigChange(sectionIdx: number) {
+    setForm(f => {
+      const sections = [...f.sections]
+      const existing = sections[sectionIdx].timeSigChanges ?? []
+      sections[sectionIdx] = { ...sections[sectionIdx], timeSigChanges: [...existing, { measure: 2, timeSignature: '' }] }
+      return { ...f, sections }
+    })
+  }
+
+  function removeTimeSigChange(sectionIdx: number, changeIdx: number) {
+    setForm(f => {
+      const sections = [...f.sections]
+      const next = (sections[sectionIdx].timeSigChanges ?? []).filter((_, j) => j !== changeIdx)
+      sections[sectionIdx] = { ...sections[sectionIdx], timeSigChanges: next.length ? next : undefined }
+      return { ...f, sections }
+    })
+  }
+
+  function updateTimeSigChange(sectionIdx: number, changeIdx: number, patch: Partial<TimeSigChange>) {
+    setForm(f => {
+      const sections = [...f.sections]
+      const changes = [...(sections[sectionIdx].timeSigChanges ?? [])]
+      changes[changeIdx] = { ...changes[changeIdx], ...patch }
+      sections[sectionIdx] = { ...sections[sectionIdx], timeSigChanges: changes }
+      return { ...f, sections }
+    })
+  }
+
+  function sortTimeSigChanges(sectionIdx: number) {
+    setForm(f => {
+      const sections = [...f.sections]
+      const sorted = [...(sections[sectionIdx].timeSigChanges ?? [])].sort((a, b) => a.measure - b.measure)
+      sections[sectionIdx] = { ...sections[sectionIdx], timeSigChanges: sorted }
+      return { ...f, sections }
+    })
+  }
+
   async function save() {
     setSaving(true)
     const spec = formToSpec()
@@ -353,12 +409,17 @@ export default function SongEditor({ songId }: Props) {
     }
   }
 
-  const et = eventTypes.reduce<Record<string, EventTypeSummary>>((acc, e) => { acc[e.slug] = e; return acc }, {})
+  const et: Record<string, EventTypeSummary> = {
+    ...eventTypes.reduce<Record<string, EventTypeSummary>>((acc, e) => { acc[e.slug] = e; return acc }, {}),
+    [VARIAX_TUNING_SLUG]: VARIAX_TUNING_EVENT_TYPE,
+  }
 
   const gearOptions = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>()
     for (const t of eventTypes) map.set(t.gearId, { id: t.gearId, name: t.gear.name })
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+    const options = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+    options.push(VARIAX_GEAR_OPTION)
+    return options
   }, [eventTypes])
 
   function rowKey(si: number, ei: number) { return `${si}-${ei}` }
@@ -370,7 +431,7 @@ export default function SongEditor({ songId }: Props) {
   function onGearChange(si: number, ei: number, ev: SongEvent, newGearId: string) {
     setGearByRow(g => ({ ...g, [rowKey(si, ei)]: newGearId }))
     if (ev.event && et[ev.event]?.gearId !== newGearId) {
-      updateEvent(si, ei, { event: '', parameter: undefined })
+      updateEvent(si, ei, { event: '', parameter: undefined, tuning: undefined })
     }
   }
 
@@ -550,7 +611,8 @@ export default function SongEditor({ songId }: Props) {
                             const [evBar] = ev.position.split('.').map(Number)
                             const outOfBounds = evBar > sectionBars
                             return (
-                              <motion.div layout transition={{ duration: 0.2 }} exit={{ opacity: 0 }} key={ev._key ?? ei} className={`flex items-center gap-2${outOfBounds ? ' ring-1 ring-red-500/50 rounded px-1 -mx-1' : ''}`}>
+                              <motion.div layout transition={{ duration: 0.2 }} exit={{ opacity: 0 }} key={ev._key ?? ei} className={`flex flex-col gap-1${outOfBounds ? ' ring-1 ring-red-500/50 rounded px-1 -mx-1' : ''}`}>
+                                <div className="flex items-center gap-2">
                                 {(() => {
                                   const [bar = '1', beat = '1', sub = '1'] = ev.position.split('.')
                                   const setPos = (b: string, bt: string, s: string) => updateEvent(si, ei, { position: `${b}.${bt}.${s}` })
@@ -569,7 +631,10 @@ export default function SongEditor({ songId }: Props) {
                                 })()}
                                 {(() => {
                                   const rowGearId = getRowGear(si, ei, ev)
-                                  const filteredEvents = eventTypes.filter(t => t.gearId === rowGearId)
+                                  const filteredEvents = [
+                                    ...eventTypes.filter(t => t.gearId === rowGearId),
+                                    ...(rowGearId === VARIAX_GEAR_ID ? [VARIAX_TUNING_EVENT_TYPE] : []),
+                                  ]
                                   return (
                                     <div className="flex flex-1 gap-2 min-w-0">
                                       <select
@@ -586,7 +651,11 @@ export default function SongEditor({ songId }: Props) {
                                         className="flex-1 min-w-0 rounded bg-gray-800 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                                         value={ev.event}
                                         disabled={!rowGearId}
-                                        onChange={e => updateEvent(si, ei, { event: e.target.value, parameter: undefined })}
+                                        onChange={e => {
+                                          const slug = e.target.value
+                                          const tuning = slug === VARIAX_TUNING_SLUG ? [...form.tuning] : undefined
+                                          updateEvent(si, ei, { event: slug, parameter: undefined, tuning })
+                                        }}
                                       >
                                         <option value="">{rowGearId && filteredEvents.length === 0 ? 'No events for this gear' : 'Event…'}</option>
                                         {filteredEvents.map(t => (
@@ -606,6 +675,29 @@ export default function SongEditor({ songId }: Props) {
                                   />
                                 )}
                                 <button onClick={() => removeEvent(si, ei)} className="text-gray-500 hover:text-red-400 text-sm">✕</button>
+                                </div>
+                                {ev.event === VARIAX_TUNING_SLUG && (
+                                  <div className="grid grid-cols-6 gap-1 pl-1">
+                                    {STRING_LABELS.map((label, idx) => (
+                                      <div key={idx}>
+                                        <div className="text-[10px] text-gray-500 text-center mb-0.5">{label}</div>
+                                        <select
+                                          className="w-full rounded bg-gray-800 px-0.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                          value={(ev.tuning ?? [0,0,0,0,0,0])[idx]}
+                                          onChange={e => {
+                                            const newTuning = [...(ev.tuning ?? [0,0,0,0,0,0])]
+                                            newTuning[idx] = Number(e.target.value)
+                                            updateEvent(si, ei, { tuning: newTuning })
+                                          }}
+                                        >
+                                          {getTuningOptions(idx).map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </motion.div>
                             )
                           })}
@@ -617,6 +709,43 @@ export default function SongEditor({ songId }: Props) {
                             + Add event
                           </button>
                         </div>
+
+                        {/* Mid-section meter changes (each persists until the next change) */}
+                        {(() => {
+                          const changes = section.timeSigChanges ?? []
+                          const [sectionBars] = section.length.split('.').map(Number)
+                          return (
+                            <div className="mt-3 pl-2 border-l border-gray-700 space-y-1.5">
+                              {changes.map((tc, ci) => (
+                                <div key={ci} className="flex items-center gap-2">
+                                  <span className="text-[10px] text-gray-500">at bar</span>
+                                  <input
+                                    type="number" min={2} max={sectionBars}
+                                    className="w-12 rounded bg-gray-800 px-1.5 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    value={tc.measure}
+                                    onChange={e => updateTimeSigChange(si, ci, { measure: Number(e.target.value) })}
+                                    onBlur={() => sortTimeSigChanges(si)}
+                                    title="Measure where the new meter begins (the opening meter uses the section time-sig field)"
+                                  />
+                                  <span className="text-[10px] text-gray-500">switch to</span>
+                                  <input
+                                    className="w-14 rounded bg-gray-800 px-1.5 py-1 text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    value={tc.timeSignature}
+                                    onChange={e => updateTimeSigChange(si, ci, { timeSignature: e.target.value })}
+                                    placeholder="2/4"
+                                  />
+                                  <button onClick={() => removeTimeSigChange(si, ci)} className="text-gray-500 hover:text-red-400 text-sm">✕</button>
+                                </div>
+                              ))}
+                              <button
+                                onClick={() => addTimeSigChange(si)}
+                                className="text-xs text-gray-500 hover:text-indigo-400 transition-colors"
+                              >
+                                + Add meter change
+                              </button>
+                            </div>
+                          )
+                        })()}
                       </div>
                     )}
                   </SortableSection>
