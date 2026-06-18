@@ -37,6 +37,52 @@ function semitoneOffsetToCCValue(offset) {
 	return Math.ceil((clamped + 12) * 127 / 24)
 }
 
+// VoiceLive 3 NaturalPlay key/scale, emitted once at tick 0.
+// CC30 = root note (0=C … 11=B); CC31 = scale (MAJ1=0, MIN1=3). VL3 is channel 1.
+const VL3_CHANNEL = 1
+const VL3_KEY_ROOT_CC = 30
+const VL3_KEY_SCALE_CC = 31
+
+// Root names → CC30 value. Flats are accepted as enharmonic equivalents.
+const KEY_ROOT_VALUES = {
+	c: 0, 'b#': 0,
+	'c#': 1, db: 1,
+	d: 2,
+	'd#': 3, eb: 3,
+	e: 4, fb: 4,
+	f: 5, 'e#': 5,
+	'f#': 6, gb: 6,
+	g: 7,
+	'g#': 8, ab: 8,
+	a: 9,
+	'a#': 10, bb: 10,
+	b: 11, cb: 11,
+}
+
+// Scale names → CC31 value. "major"/"minor" map to MAJ1/MIN1; the raw VL3
+// scale tokens are also accepted for the other variations.
+const KEY_SCALE_VALUES = {
+	major: 0, maj: 0, maj1: 0, maj2: 1, maj3: 2,
+	minor: 3, min: 3, min1: 3, min2: 4, min3: 5,
+	cust: 6,
+}
+
+/**
+ * Parse a "<root> <scale>" key string (e.g. "C major", "F# minor") into the
+ * VoiceLive 3 CC values. Throws on an unrecognised root or scale.
+ * @param {string} key
+ * @returns {{ rootValue: number, scaleValue: number }}
+ */
+function parseKey(key) {
+	const parts = String(key).trim().split(/\s+/)
+	if (parts.length < 2) throw new Error(`Invalid key "${key}" — expected "<root> <scale>", e.g. "C major"`)
+	const rootValue = KEY_ROOT_VALUES[parts[0].toLowerCase()]
+	if (rootValue === undefined) throw new Error(`Invalid key root "${parts[0]}" in key "${key}"`)
+	const scaleValue = KEY_SCALE_VALUES[parts.slice(1).join(' ').toLowerCase()]
+	if (scaleValue === undefined) throw new Error(`Invalid key scale "${parts.slice(1).join(' ')}" in key "${key}"`)
+	return { rootValue, scaleValue }
+}
+
 // Loopy Pro CC lookup table: time signature numerator → CC value
 // CC value is the midpoint of each range in the user's Loopy Pro binding
 const TIME_SIG_CC_VALUES = {
@@ -230,6 +276,13 @@ function generateMidi(spec, eventTypes) {
 	// tuning[0] = string 6 (low E → CC 116), tuning[5] = string 1 (high E → CC 111)
 	let currentTuning = Array.isArray(spec.tuning) ? spec.tuning : [0, 0, 0, 0, 0, 0]
 	emitTuningCCs(track, currentTuning, 0)
+
+	// Emit VoiceLive 3 key/scale CCs at tick 0 (channel 1, CC 30 root + CC 31 scale)
+	if (spec.key) {
+		const { rootValue, scaleValue } = parseKey(spec.key)
+		track.addEvent(new ControllerChangeEvent({ controllerNumber: VL3_KEY_ROOT_CC, controllerValue: rootValue, channel: VL3_CHANNEL, delta: 0 }))
+		track.addEvent(new ControllerChangeEvent({ controllerNumber: VL3_KEY_SCALE_CC, controllerValue: scaleValue, channel: VL3_CHANNEL, delta: 0 }))
+	}
 
 	// Start delta at 1 measure (count-off before the song begins).
 	// Use string '1' (not array ['1']) so beatsPerMeasure is forwarded — the array

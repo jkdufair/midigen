@@ -68,6 +68,13 @@ export interface SongSpec {
   title: string
   tempo: number
   timeSignature: string
+  /**
+   * Song key sent to the VoiceLive 3 NaturalPlay at the start of the file, as
+   * "<root> <scale>" — e.g. "C major", "F# minor". Root is one of C, C#, D, D#,
+   * E, F, F#, G, G#, A, A#, B (flats accepted as enharmonic equivalents); scale
+   * is "major" or "minor".
+   */
+  key?: string
   /** Semitone offsets from standard tuning, index 0 = string 6 (low E), index 5 = string 1 (high E) */
   tuning?: number[]
   sections: Section[]

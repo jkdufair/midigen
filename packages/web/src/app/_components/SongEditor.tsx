@@ -51,11 +51,20 @@ interface SongForm {
   title: string
   tempo: string
   timeSignature: string
+  /** VoiceLive 3 key, as "<root> <scale>" e.g. "C major"; '' = none */
+  key: string
   /** Semitone offsets from standard tuning; index 0 = string 6 (low E), index 5 = string 1 (high E) */
   tuning: number[]
   sections: Section[]
   notes: string
 }
+
+// VoiceLive 3 key root notes (CC30 order) and scales (CC31)
+const KEY_ROOT_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+const KEY_SCALES = [
+  { value: 'major', label: 'Major' },
+  { value: 'minor', label: 'Minor' },
+]
 
 // Variax tuning helpers
 const NOTE_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
@@ -101,6 +110,7 @@ const DEFAULT_SONG: SongForm = {
   title: '',
   tempo: '120',
   timeSignature: '4/4',
+  key: '',
   tuning: [0, 0, 0, 0, 0, 0],
   sections: [],
   notes: '',
@@ -179,6 +189,7 @@ export default function SongEditor({ songId }: Props) {
           title: song.title,
           tempo: String(song.tempo),
           timeSignature: song.timeSignature,
+          key: song.key ?? '',
           tuning: Array.isArray(song.tuning) ? song.tuning : [0, 0, 0, 0, 0, 0],
           sections: (song.sections ?? []).map((s: Section) => ({ ...s, events: (s.events ?? []).map(assignKey) })),
           notes: song.notes ?? '',
@@ -191,6 +202,7 @@ export default function SongEditor({ songId }: Props) {
     title: form.title,
     tempo: Number(form.tempo),
     timeSignature: form.timeSignature,
+    key: form.key || undefined,
     tuning: form.tuning,
     sections: form.sections.map(s => ({
       ...s,
@@ -211,6 +223,7 @@ export default function SongEditor({ songId }: Props) {
         title: parsed.title ?? '',
         tempo: String(parsed.tempo ?? 120),
         timeSignature: parsed.timeSignature ?? '4/4',
+        key: parsed.key ?? '',
         tuning: Array.isArray(parsed.tuning) ? parsed.tuning : [0, 0, 0, 0, 0, 0],
         sections: parsed.sections ?? [],
         notes: f.notes,
@@ -439,6 +452,11 @@ export default function SongEditor({ songId }: Props) {
   // arrayMove keeps ordering correct; IDs are re-derived after each render.
   const sectionIds = form.sections.map((_, i) => String(i))
 
+  // Key "<root> <scale>" split into the two dropdowns (scale defaults to major).
+  const [keyRoot = '', keyScale = 'major'] = form.key.trim().split(/\s+/)
+  const setKey = (root: string, scale: string) =>
+    setForm(f => ({ ...f, key: root ? `${root} ${scale}` : '' }))
+
   return (
     <div className="space-y-6">
       {/* Metadata */}
@@ -471,6 +489,31 @@ export default function SongEditor({ songId }: Props) {
               onChange={e => setForm(f => ({ ...f, timeSignature: e.target.value }))}
               placeholder="4/4"
             />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Key (VoiceLive 3)</label>
+            <div className="flex gap-2">
+              <select
+                className="flex-1 rounded bg-gray-800 px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                value={keyRoot}
+                onChange={e => setKey(e.target.value, keyScale)}
+              >
+                <option value="">— none —</option>
+                {KEY_ROOT_NOTES.map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+              <select
+                className="flex-1 rounded bg-gray-800 px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                value={keyScale}
+                disabled={!keyRoot}
+                onChange={e => setKey(keyRoot, e.target.value)}
+              >
+                {KEY_SCALES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         <div>

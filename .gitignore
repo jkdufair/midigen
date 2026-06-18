@@ -136,6 +136,11 @@ dist
 example.mid
 packages/web/dev.db
 packages/web/prisma/dev.db
+# SQLite sidecar files and local DB backups
+packages/web/prisma/dev.db-journal
+packages/web/prisma/dev.db-wal
+packages/web/prisma/dev.db-shm
+packages/web/prisma/dev.db.bak-*
 packages/web/.next/
 packages/*/node_modules/
 node_modules/

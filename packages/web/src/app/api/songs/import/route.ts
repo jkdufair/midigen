@@ -13,7 +13,7 @@ interface Section {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { title, tempo, timeSignature, sections } = body
+  const { title, tempo, timeSignature, key, tuning, sections } = body
 
   if (!title || !tempo || !timeSignature || !sections) {
     return Response.json({ error: 'title, tempo, timeSignature, and sections required' }, { status: 400 })
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   }
 
   const song = await prisma.song.create({
-    data: { title, tempo: Number(tempo), timeSignature, sections },
+    data: { title, tempo: Number(tempo), timeSignature, key: key || null, tuning: tuning ?? null, sections },
   })
   return Response.json(song, { status: 201 })
 }
