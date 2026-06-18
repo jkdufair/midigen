@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { Prisma } from '@/generated/prisma/client'
 import { NextRequest } from 'next/server'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -44,7 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const songs = await tx.song.findMany()
     for (const song of songs) {
-      const sections = song.sections as Section[]
+      const sections = song.sections as unknown as Section[]
       let modified = false
       for (const section of sections) {
         for (const ev of section.events ?? []) {
@@ -55,7 +56,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       }
       if (modified) {
-        await tx.song.update({ where: { id: song.id }, data: { sections } })
+        await tx.song.update({ where: { id: song.id }, data: { sections: sections as unknown as Prisma.InputJsonValue } })
       }
     }
 

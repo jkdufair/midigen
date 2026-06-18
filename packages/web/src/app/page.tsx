@@ -9,6 +9,7 @@ interface SongSummary {
   title: string
   tempo: number
   timeSignature: string
+  key: string | null
   updatedAt: string
 }
 
@@ -419,7 +420,7 @@ export default function SongsPage() {
                 />
                 <div>
                   <Link href={`/songs/${song.id}`} className="font-medium hover:text-indigo-400 transition-colors">{song.title}</Link>
-                  <span className="ml-3 text-sm text-gray-400">{song.tempo} BPM · {song.timeSignature}</span>
+                  <span className="ml-3 text-sm text-gray-400">{song.tempo} BPM · {song.timeSignature}{song.key ? ` · ${song.key}` : ''}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">

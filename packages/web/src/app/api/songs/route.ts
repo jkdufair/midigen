@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
       title: true,
       tempo: true,
       timeSignature: true,
+      key: true,
       createdAt: true,
       updatedAt: true,
       ...(withNotes ? { notes: true } : {}),
