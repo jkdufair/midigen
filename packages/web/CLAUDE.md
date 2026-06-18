@@ -12,4 +12,7 @@ This package uses Prisma (v7, SQLite) with a **migration history** (`prisma/migr
 - **`prisma/dev.db` is git-ignored and must stay untracked** (along with `*-journal/-wal/-shm` sidecars and `dev.db.bak-*` backups). Never `git add` the database.
 - **Commit the `prisma/migrations/` folder** — it is the source-of-truth schema history.
 - If the DB and migration history have already drifted, the safe non-destructive fix is to **re-baseline**: back up `dev.db`, generate one `0_init` migration from the schema (`prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script`), clear `_prisma_migrations`, then `prisma migrate resolve --applied 0_init`. Confirm `prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --script` is empty before and after.
-- **Production/Vercel has its own migration history.** After a local re-baseline, the prod DB may need `prisma migrate resolve --applied 0_init` once before the next `migrate deploy`. Flag this to the user rather than assuming.
+- **Deploying to a database other than local `dev.db`:**
+  - **Fresh/empty deployment DB** (the normal first deploy): just run `npx prisma migrate deploy`. It applies `0_init` (and any later migrations) cleanly — no baseline step needed.
+  - **A deployment DB that already has tables but no matching `_prisma_migrations` history** (e.g. it was set up via `db push` or predates this re-baseline): run `npx prisma migrate resolve --applied 0_init` against it once *before* `migrate deploy`, so it records the baseline as already applied instead of trying to recreate existing tables.
+  - There is no separate deployment yet, so nothing to do until one exists.
